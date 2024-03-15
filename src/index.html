@@ -1,43 +1,177 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DICOM Viewer</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://unpkg.com/cornerstone-core"></script>
-    <script src="https://unpkg.com/cornerstone-math"></script>
-    <script src="https://unpkg.com/cornerstone-tools"></script>
-    <script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
-    <script src="https://unpkg.com/dicom-parser"></script>
-
+<title>DICOM Viewer</title>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/cornerstone-core"></script>
+<script src="https://unpkg.com/cornerstone-math"></script>
+<script src="https://unpkg.com/cornerstone-tools"></script>
+<script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
+<script src="https://unpkg.com/dicom-parser"></script>
+ 
     <script>
         cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
         cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-    </script>
+</script>
+
+
+<style>
+    /* Inline CSS here */
+    #layout {
+        display: flex;
+        align-items: flex-start;
+    }
+ 
+    #dicomViewer {
+        width: 512px;
+        height: 512px;
+        border: 0px solid black;
+    }
+ 
+    #dicom-metadata-table {
+        border-collapse: collapse;
+    margin: 25px 0;
+    font-size: 0.9em;
+    font-family: sans-serif;
+    min-width: 400px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    }
+ 
+    #dicom-metadata-table th, #dicom-metadata-table td {
+        border: 1px solid black;
+        width: 251px;
+        height: 21px;
+        padding: 12px 15px;
+    }
+
+    #dicom-metadata-table th {
+    background-color: #009879;
+    color: #ffffff;
+    text-align: left;
+    }
+</style>
+<!-- <style>
+        /* Quick style to align the table */
+        #dicom-metadata-table {
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        #dicom-metadata-table, #dicom-metadata-table th, #dicom-metadata-table td {
+            border: 1px solid black;
+        }
+        #dicom-metadata-table th, #dicom-metadata-table td {
+            padding: 5px;
+        }
+        #dicomViewer {
+            width:512px;
+            height:512px;
+            border: 1px solid black;
+            margin-top: 10px;
+        }
+</style> -->
 </head>
 <body>
     <h2>Upload DICOM File</h2>
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="dicom.zip" accept=".zip">
-        <input type="submit" value="Upload">
+    <input type="file" name="file" accept=".zip">
+    <input type="submit" value="Upload">
     </form>
-
-    <div id="dicomViewer" style="width:512px;height:512px;"></div>
-
+    <div id="layout">
+        <div id="dicomViewer"></div>
+        <table id="dicom-metadata-table">
+            <tr><th>Field</th><th>Value</th></tr>
+            <!-- Metadata rows will be inserted here by JavaScript -->
+        </table>
+    </div>
+        <div id="dicomViewer"></div>
+    
+        <!-- Table to display DICOM metadata -->
+    <table id="dicom-metadata-table">
+    
+<!-- Metadata rows will be inserted here by JavaScript -->
+<table id="dicom-metadata-table">
+    <tr><th>New Header 1</th><th>New Header 2</th></tr>
+    <!-- Metadata rows will be inserted here by JavaScript -->
+</table>
+ 
     <script>
-       $(document).ready(function() {
+        $(document).ready(function() {
             const element = document.getElementById('dicomViewer');
             cornerstone.enable(element);
-
+ 
             let dicomFiles = [];
             let currentIndex = 0;
-
+ 
             function loadDicomImage(imageIndex) {
                 const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
+                    // Populate the metadata table for the current image
+                    fetchAndDisplayMetadata(dicomFiles[currentIndex]);
                 });
             }
-
+ 
+        function populateMetadataTable(metadata) {
+            const table = document.getElementById('dicom-metadata-table');
+            // Clear existing table rows, except for the header
+            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
+ 
+            // Helper function to generate random data for demonstration purposes
+            function getRandomData(field) {
+                switch(field) {
+                    case 'Patient Name':
+                        return 'John Doe';
+                    case 'Patient Birth Date':
+                        return '1980-01-01'; // Default random birth date
+                    case 'Body Part Examined':
+                        return 'Head';
+                    case 'Study Time':
+                        return '14:30:00';
+                    case 'Accession Number':
+                        return Math.random().toString(36).slice(2, 10);
+                    case 'Modality':
+                        return 'CT';
+                    case 'Study Description':
+                        return 'Routine checkup';
+                    default:
+                        return 'Random Value';
+                }
+            }
+            
+            function formatBirthDate(dateString) {
+                if (dateString && dateString.length === 8) {
+                    return dateString.substring(0, 4) + '-' + dateString.substring(4, 6) + '-' + dateString.substring(6, 8);
+                }
+                return dateString;
+            }
+ 
+            // Populate the table with metadata or random dummy data if 'NA'
+            metadata.forEach(function(fieldInfo) {
+                const row = table.insertRow(-1);
+                const cellField = row.insertCell(0);
+                const cellValue = row.insertCell(1);
+                cellField.textContent = fieldInfo['Field'];
+                
+                let value = fieldInfo['Value'] !== 'NA' ? fieldInfo['Value'] : getRandomData(fieldInfo['Field']);
+                if (fieldInfo['Field'] === 'Patient Birth Date') {
+                    value = formatBirthDate(value);
+                }
+                
+                cellValue.textContent = value;
+            });
+        }
+ 
+ 
+ 
+            function fetchAndDisplayMetadata(filename) {
+                $.getJSON(`/dicom-metadata/${filename}`, function(metadata) {
+                    populateMetadataTable(metadata);
+                }).fail(function() {
+                    console.error("Failed to load DICOM metadata");
+                });
+            }
+ 
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
                 dicomFiles = files;
@@ -45,7 +179,7 @@
                     loadDicomImage(0); // Load the first image initially
                 }
             });
-
+ 
             // Implement scrolling to navigate through DICOM files
             $(element).on('mousewheel DOMMouseScroll', function(e) {
                 e.preventDefault();
@@ -56,6 +190,6 @@
                 loadDicomImage(currentIndex);
             });
         });
-    </script>
+</script>
 </body>
 </html>
