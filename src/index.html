@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DICOM Viewer</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-core"></script>
+    <script src="https://unpkg.com/cornerstone-math"></script>
+    <script src="https://unpkg.com/cornerstone-tools"></script>
+    <script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
+    <script src="https://unpkg.com/dicom-parser"></script>
+
+    <script>
+        cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+        cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+    </script>
+</head>
+<body>
+    <h2>Upload DICOM File</h2>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="dicom.zip" accept=".zip">
+        <input type="submit" value="Upload">
+    </form>
+
+    <div id="dicomViewer" style="width:512px;height:512px;"></div>
+
+    <script>
+       $(document).ready(function() {
+            const element = document.getElementById('dicomViewer');
+            cornerstone.enable(element);
+
+            let dicomFiles = [];
+            let currentIndex = 0;
+
+            function loadDicomImage(imageIndex) {
+                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
+                cornerstone.loadImage(imageId).then(function(image) {
+                    cornerstone.displayImage(element, image);
+                });
+            }
+
+            // Fetch the list of DICOM files
+            $.getJSON('/list-dicom-files', function(files) {
+                dicomFiles = files;
+                if (dicomFiles.length > 0) {
+                    loadDicomImage(0); // Load the first image initially
+                }
+            });
+
+            // Implement scrolling to navigate through DICOM files
+            $(element).on('mousewheel DOMMouseScroll', function(e) {
+                e.preventDefault();
+                const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
+                currentIndex += delta > 0 ? -1 : 1;
+                if (currentIndex < 0) currentIndex = 0;
+                if (currentIndex >= dicomFiles.length) currentIndex = dicomFiles.length - 1;
+                loadDicomImage(currentIndex);
+            });
+        });
+    </script>
+</body>
+</html>
