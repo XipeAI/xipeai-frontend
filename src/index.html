@@ -32,7 +32,6 @@
             let currentIndex = 0;
 
             function loadDicomImage(imageIndex) {
-                console.log(dicomFiles[imageIndex])
                 const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
