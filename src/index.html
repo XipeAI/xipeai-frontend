@@ -24,11 +24,17 @@
             background-color: #f4f4f4;
             color: #333;
         }
-     
-        /* Center the title */
-        h2 {
+
+        /* Add styles for the header-title class */
+        .header-title {
+            background-color: #009879; /* Replace with the color you want */
+            color: #ffffff; /* Optional: Change the text color if needed */
+            padding: 30px; /* Optional: Add some padding */
+            margin-top: 0;
             text-align: center;
         }
+
+     
      
         /* Flex container */
         #layout {
@@ -37,31 +43,64 @@
             align-items: flex-start;
             justify-content: space-between; /* Distributes space between and around content items */
         
-            margin-top: 20px; /* Space for the title */
+            margin-top: 50px; /* Space for the title */
         }
      
         /* DICOM Viewer styles */
         #dicomViewer {
             flex: 1; /* Allocate half of the available space */
             width: 50%; /* Adjust width if necessary */
-            height: 350px; /* New height for the DICOM viewer */
+            height: 400px; /* New height for the DICOM viewer */
             display: flex; /* Use flexbox for centering the content */
             justify-content: center; /* Center horizontally in the flex container */
             align-items: center; /* Center vertically in the flex container */
-            border: 1px solid #ddd; /* A light grey border */
+            border: 5px solid #009879; /* A light grey border */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* A subtle shadow for depth */
-            padding: 10px; /* Space inside the viewer */
+            padding: 10px;
+            background-color: #000000;
+           
         }
+
+       
 
          /* Slider styles */
          #slider-container {
-            width: 100%;
+            width: 50%;
+            border-radius: 5px;
             margin-top: 20px;
+            padding-top: 3px;
+            padding-left: 15px;
+            padding-right: 15px;
+            background: #009879;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
         }
         
         input[type='range'] {
             width: 100%;
             cursor: pointer;
+        }
+
+        .rs-label {          
+            position: relative;
+            transform-origin: center center;
+            display: block;
+            width: 60px;
+            height: 60px;
+            
+            line-height: 30px;
+            
+            text-align: center;
+            font-weight: bold;
+            padding-top: 14px;
+            box-sizing: border-box;
+            color: #333;
+            font-style: normal;
+            font-weight: normal;
+            line-height: normal;
+            font-size: 20px;
+            
         }
      
      
@@ -136,17 +175,30 @@
                 background-color: #007b66; /* Darken color on hover */
         }
 
+        #form-container {
+            display: flex; /* Use flexbox */
+            justify-content: center; /* Center horizontally */
+            align-items: center; /* Center vertically */
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+
+        
+
     </style>
 </head>
 <body>
-    <h2>XipeAI | DICOM Viewer</h2>
+    <h2 class="header-title">XipeAI | DICOM Viewer</h2>
+    <hr>
+<div id="form-container">
     <form action="/upload" method="post" enctype="multipart/form-data">
         <label for="file-upload" class="custom-file-upload">Choose File</label>
         <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
         <span id="file-name">No file chosen</span>
         <input type="submit" value="Upload">
     </form>
-
+</div>
+<hr>
     <div id="layout">
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
@@ -160,8 +212,11 @@
 
     <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
     <div id="slider-container">
-        <input type="range" id="dicom-slider" min="0" value="0">
+        <input type="range" min="1" max="100" value="50" class="slider" id="dicom-slider">
     </div>
+    <span id="rs-bullet" class="rs-label">0 / 0</span>
+
+
  
     <script>
         let currentIndex = 0;
@@ -177,18 +232,25 @@
  
         
 
-        function loadDicomImage(imageIndex) {
-            const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
-            cornerstone.loadImage(imageId).then(function(image) {
-                cornerstone.displayImage(element, image);
-                // Populate the metadata table for the current image
-                fetchAndDisplayMetadata(dicomFiles[currentIndex]);
+            function loadDicomImage(imageIndex) {
+                if (dicomFiles.length === 0) return; // Ensure there are DICOM files to load
 
-                const slider = document.getElementById('dicom-slider');
-                slider.max = dicomFiles.length - 1;
-                slider.value = imageIndex;
-            });
-}
+                // Adjust the image index to valid range
+                const validIndex = Math.max(0, Math.min(imageIndex, dicomFiles.length - 1));
+                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[validIndex]}`;
+
+                cornerstone.loadImage(imageId).then(function(image) {
+                    cornerstone.displayImage(element, image);
+                    fetchAndDisplayMetadata(dicomFiles[validIndex]);
+                });
+
+                
+
+
+                // Update the slider and currentIndex
+                currentIndex = validIndex;
+                document.getElementById('dicom-slider').value = validIndex;
+            }
 
  
         function populateMetadataTable(metadata) {
@@ -208,11 +270,14 @@
                     case 'Study Time':
                         return '14:30:00';
                     case 'Accession Number':
-                        return Math.random().toString(36).slice(2, 10);
+                        return Math.random().toString().slice(2, 10);
                     case 'Modality':
                         return 'CT';
+                    case 'Result':
+                        return 'Critical';
                     case 'Study Description':
                         return 'Routine checkup';
+            
                     default:
                         return 'Random Value';
                 }
@@ -259,43 +324,40 @@
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
                 dicomFiles = files;
-                
-                // Check if there are any DICOM files returned
                 if (dicomFiles.length > 0) {
-                    // Load the first image initially
-                    loadDicomImage(0);
+                    // Calculate the initial index to start at the middle of the DICOM files list
+                    const initialIndex = Math.floor(dicomFiles.length / 2);
+
+                    const slider = document.getElementById('dicom-slider');
+                    slider.max = dicomFiles.length - 1;
+                    slider.value = initialIndex; // Set slider position to the middle
+
+                    // Load the DICOM image at the initial index (middle of the list)
+                    loadDicomImage(initialIndex);
+
+                    // Set the initial value display
+                    showSliderValue(); // <-- This is the new position of the call
+
+                    slider.addEventListener('input', function() {
+                        loadDicomImage(parseInt(this.value, 10));
+                        showSliderValue(); 
+                    });
+                }   else {
+                    // Handle the case where there are no DICOM files
+                    rangeBullet.innerHTML = '0 / 0';
                 }
-
-                // Get the slider element from the DOM
-                const slider = document.getElementById('dicom-slider');
-                
-                // Initialize the slider's maximum range based on the number of DICOM files
-                slider.max = dicomFiles.length - 1;
-                
-                // Set the slider's current value to 0 (first image)
-                slider.value = 0;
-
-                // Attach an event listener to the slider to load the image when the slider value changes
-                slider.addEventListener('input', function(e) {
-                    // Parse the new index from the slider value
-                    const index = parseInt(e.target.value, 10);
-                    
-                    // Update the current index to the new value
-                    currentIndex = index;
-                    
-                    // Load the DICOM image at the new index
-                    loadDicomImage(index);
-                });
             });
+
  
-            // Implement scrolling to navigate through DICOM files
             $(element).on('mousewheel DOMMouseScroll', function(e) {
-                e.preventDefault();
-                const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
-                currentIndex += delta > 0 ? -1 : 1;
-                if (currentIndex < 0) currentIndex = 0;
-                if (currentIndex >= dicomFiles.length) currentIndex = dicomFiles.length - 1;
-                loadDicomImage(currentIndex);
+                e.preventDefault(); // Prevent default scroll action
+
+                const direction = e.originalEvent.wheelDelta || -e.originalEvent.detail;
+                let newIndex = currentIndex + (direction > 0 ? -1 : 1);
+                // Ensure newIndex is within the valid range
+                newIndex = Math.max(0, Math.min(newIndex, dicomFiles.length - 1));
+
+                loadDicomImage(newIndex);
             });
 
             function updateProgressBar() {
@@ -304,7 +366,38 @@
                 progressBar.style.width = percentage + '%';
             }
 
+            var rangeSlider = document.getElementById("dicom-slider");
+            var rangeBullet = document.getElementById("rs-bullet");
+
+            
+
+            function showSliderValue() {
+                var value = rangeSlider.value; // Get the current value of the slider
+                var max = rangeSlider.max; // Get the maximum value of the slider
+
+                // Update the bullet with the current value and the total number of segmentations
+                rangeBullet.innerHTML = (parseInt(value)) + '/' + (dicomFiles.length);
+
+                // Calculate the bullet's position as a percentage
+                var percent = ((value - rangeSlider.min) / (max - rangeSlider.min));
+
+                // Get the thumb's width. Adjust this value to match the actual thumb width
+                var thumbWidth = -37; // Let's assume the thumb width is 20px
+
+                // Calculate the new position of the bullet. We subtract thumbWidth to center it
+                var bulletPosition = percent * (rangeSlider.offsetWidth - thumbWidth) + (thumbWidth);
+
+                // Adjust the bullet's position
+                rangeBullet.style.left = bulletPosition + 'px';
+            }
+
+
+            // Add the event listener to update the value display on input
+            rangeSlider.addEventListener('input', showSliderValue, false);
+
+
         });
+        
 </script>
 </body>
 </html>
