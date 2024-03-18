@@ -13,10 +13,11 @@ UPLOAD_FOLDER = 'uploads'
 EXTRACTED_FOLDER = 'extracted'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
- 
+
 @app.route('/dicom-metadata/dummy')
 def dicom_metadata_dummy():
     dummy_data = [
+        {"Field": "Name", "Value": "Sagway"},
         {"Field": "First Name", "Value": "Donald"},
         {"Field": "Patient ID", "Value": "6594589"},
         {"Field": "Acquisition Date", "Value": "05.02.2026"},
@@ -24,8 +25,8 @@ def dicom_metadata_dummy():
         {"Field": "Result", "Value": "Critical(1)"},
         {"Field": "Area (1)", "Value": "25mm²"},
         {"Field": "Position (1)", "Value": "x25 y37"},
-        {"Field": "Area (2)", "Value": "NA"},
-        {"Field": "Position (2)", "Value": "NA"},
+        {"Field": "Area (2)", "Value": "NA"},  # Assuming NA means data not available
+        {"Field": "Position (2)", "Value": "NA"},  # Assuming NA means data not available
         # ... add more fields as needed
     ]
     return jsonify(dummy_data)
@@ -136,32 +137,32 @@ def dicom_metadata(filename):
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
     # Create a secure, absolute file path
     dicom_file_path = safe_join(base_dir, filename)
- 
+
     # Ensure the file exists
     if not os.path.exists(dicom_file_path):
         return jsonify({'error': 'File not found'}), 404
- 
+
     # Extract the metadata from the DICOM file
     ds = pydicom.dcmread(dicom_file_path)
- 
+
     # Define which metadata fields you want to extract
     metadata_fields = [
-        ('PatientName', 'Patient Name'),
-        ('PatientBirthDate', 'Patient Birth Date'),
-        ('BodyPartExamined', 'Body Part Examined'),
+        ('PatientName', 'Patient Name'), 
+        ('PatientBirthDate', 'Patient Birth Date'), 
+        ('BodyPartExamined', 'Body Part Examined'), 
         ('StudyTime', 'Study Time'),
-        ('AccessionNumber', 'Accession Number'),
-        ('Modality', 'Modality'),
+        ('AccessionNumber', 'Accession Number'), 
+        ('Modality', 'Modality'), 
         ('StudyDescription', 'Study Description')
     ]
- 
+
     # Extract the required metadata fields and preserve order in a list
     ordered_metadata = [
         {"Field": display, "Value": str(getattr(ds, tag, 'NA'))}
         for tag, display in metadata_fields
     ]
- 
+
     return jsonify(ordered_metadata)
- 
+
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1')
