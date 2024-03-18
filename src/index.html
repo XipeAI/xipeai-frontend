@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -8,44 +9,285 @@
     <script src="https://unpkg.com/cornerstone-tools"></script>
     <script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
     <script src="https://unpkg.com/dicom-parser"></script>
-
     <script>
         cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
         cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
     </script>
+    <style>
+ 
+        /* Base styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+     
+        /* Center the title */
+        h2 {
+            text-align: center;
+        }
+     
+        /* Flex container */
+        #layout {
+            display: flex;
+            flex-wrap: nowrap; /* Prevents flex items from wrapping */
+            align-items: flex-start;
+            justify-content: space-between; /* Distributes space between and around content items */
+        
+            margin-top: 20px; /* Space for the title */
+        }
+     
+        /* DICOM Viewer styles */
+        #dicomViewer {
+            flex: 1; /* Allocate half of the available space */
+            width: 50%; /* Adjust width if necessary */
+            height: 350px; /* New height for the DICOM viewer */
+            display: flex; /* Use flexbox for centering the content */
+            justify-content: center; /* Center horizontally in the flex container */
+            align-items: center; /* Center vertically in the flex container */
+            border: 1px solid #ddd; /* A light grey border */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* A subtle shadow for depth */
+            padding: 10px; /* Space inside the viewer */
+        }
+
+         /* Slider styles */
+         #slider-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        input[type='range'] {
+            width: 100%;
+            cursor: pointer;
+        }
+     
+     
+        /* DICOM Metadata Table styles */
+        #dicom-metadata-table {
+            flex: 1; /* Allocate the other half of the available space */
+            border-collapse: collapse;
+            margin-left: 20px; /* You can remove this if you want the table to use the full half space */
+        }
+     
+        #dicom-metadata-table th, #dicom-metadata-table td {
+            border: 1px solid #ddd; /* Consistent with the viewer border */
+            padding: 10px; /* More space for content */
+            text-align: left; /* Align text to the left */
+        }
+     
+        #dicom-metadata-table th{
+                background-color: #009879;
+                color: #ffffff;
+            }
+     
+        #dicom-metadata-table tr:nth-of-type(even) {
+                background-color: #d4d4d4;
+               }
+     
+        #dicom-metadata-table tbody tr:last-of-type {
+            border-bottom: 2px solid #009879;
+            }
+     
+           
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            /* Stack the layout on smaller screens */
+            #layout {
+                flex-direction: column;
+            }
+     
+            #dicomViewer,
+            #dicom-metadata-table {
+                width: 100%; /* Full width on smaller screens */
+                margin-left: 0; /* Remove the margin on smaller screens */
+            }  
+           
+        }
+     
+        /* Style for file input */
+        input[type="file"] {
+                display: none; /* Hide the default file input */
+        }
+       
+        .custom-file-upload {
+                border: 1px solid #ccc;
+                display: inline-block;
+                padding: 6px 12px;
+                cursor: pointer;
+                background-color: #009879; /* Change background color */
+                color: #fff; /* Change text color */
+                border-radius: 4px; /* Add rounded corners */
+        }
+     
+        /* Style for upload button */
+        input[type="submit"] {
+                border: none;
+                background-color: #009879; /* Change background color */
+                color: #fff; /* Change text color */
+                padding: 10px 20px; /* Adjust padding */
+                border-radius: 4px; /* Add rounded corners */
+                cursor: pointer;
+            }
+     
+        input[type="submit"]:hover {
+                background-color: #007b66; /* Darken color on hover */
+        }
+
+    </style>
 </head>
 <body>
-    <h2>Upload DICOM File</h2>
+    <h2>XipeAI | DICOM Viewer</h2>
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="dicom.zip" accept=".zip">
+        <label for="file-upload" class="custom-file-upload">Choose File</label>
+        <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
+        <span id="file-name">No file chosen</span>
         <input type="submit" value="Upload">
     </form>
 
-    <div id="dicomViewer" style="width:512px;height:512px;"></div>
+    <div id="layout">
+        <!-- DICOM Viewer -->
+        <div id="dicomViewer"></div>
 
+        <!-- DICOM Metadata Table -->
+        <table id="dicom-metadata-table">
+            <tr><th>Field</th><th>Value</th></tr>
+            <!-- Metadata rows will be inserted here by JavaScript -->
+        </table>
+    </div>
+
+    <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
+    <div id="slider-container">
+        <input type="range" id="dicom-slider" min="0" value="0">
+    </div>
+ 
     <script>
-       $(document).ready(function() {
+        let currentIndex = 0;
+        let dicomFiles = [];
+
+        function updateFileName(input) {
+            document.getElementById('file-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
+        }
+
+        $(document).ready(function() {
             const element = document.getElementById('dicomViewer');
             cornerstone.enable(element);
+ 
+        
 
-            let dicomFiles = [];
-            let currentIndex = 0;
+        function loadDicomImage(imageIndex) {
+            const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
+            cornerstone.loadImage(imageId).then(function(image) {
+                cornerstone.displayImage(element, image);
+                // Populate the metadata table for the current image
+                fetchAndDisplayMetadata(dicomFiles[currentIndex]);
 
-            function loadDicomImage(imageIndex) {
-                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
-                cornerstone.loadImage(imageId).then(function(image) {
-                    cornerstone.displayImage(element, image);
-                });
+                const slider = document.getElementById('dicom-slider');
+                slider.max = dicomFiles.length - 1;
+                slider.value = imageIndex;
+            });
+}
+
+ 
+        function populateMetadataTable(metadata) {
+            const table = document.getElementById('dicom-metadata-table');
+            // Clear existing table rows, except for the header
+            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
+
+            // Helper function to generate random data for demonstration purposes
+            function getRandomData(field) {
+                switch(field) {
+                    case 'Patient Name':
+                        return 'John Doe';
+                    case 'Patient Birth Date':
+                        return '1980-01-01'; // Default random birth date
+                    case 'Body Part Examined':
+                        return 'Head';
+                    case 'Study Time':
+                        return '14:30:00';
+                    case 'Accession Number':
+                        return Math.random().toString(36).slice(2, 10);
+                    case 'Modality':
+                        return 'CT';
+                    case 'Study Description':
+                        return 'Routine checkup';
+                    default:
+                        return 'Random Value';
+                }
+            }
+            function updateProgressBar(currentIndex, totalFiles) {
+            const progressPercentage = (currentIndex / totalFiles) * 100;
+            document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
+        }
+
+            
+            function formatBirthDate(dateString) {
+                if (dateString && dateString.length === 8) {
+                    return dateString.substring(0, 4) + '-' + dateString.substring(4, 6) + '-' + dateString.substring(6, 8);
+                }
+                return dateString;
             }
 
+            // Populate the table with metadata or random dummy data if 'NA'
+            metadata.forEach(function(fieldInfo) {
+                const row = table.insertRow(-1);
+                const cellField = row.insertCell(0);
+                const cellValue = row.insertCell(1);
+                cellField.textContent = fieldInfo['Field'];
+                
+                let value = fieldInfo['Value'] !== 'NA' ? fieldInfo['Value'] : getRandomData(fieldInfo['Field']);
+                if (fieldInfo['Field'] === 'Patient Birth Date') {
+                    value = formatBirthDate(value);
+                }
+                
+                cellValue.textContent = value;
+            });
+        }
+
+
+ 
+            function fetchAndDisplayMetadata(filename) {
+                $.getJSON(`/dicom-metadata/${filename}`, function(metadata) {
+                    populateMetadataTable(metadata);
+                }).fail(function() {
+                    console.error("Failed to load DICOM metadata");
+                });
+            }
+ 
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
                 dicomFiles = files;
+                
+                // Check if there are any DICOM files returned
                 if (dicomFiles.length > 0) {
-                    loadDicomImage(0); // Load the first image initially
+                    // Load the first image initially
+                    loadDicomImage(0);
                 }
-            });
 
+                // Get the slider element from the DOM
+                const slider = document.getElementById('dicom-slider');
+                
+                // Initialize the slider's maximum range based on the number of DICOM files
+                slider.max = dicomFiles.length - 1;
+                
+                // Set the slider's current value to 0 (first image)
+                slider.value = 0;
+
+                // Attach an event listener to the slider to load the image when the slider value changes
+                slider.addEventListener('input', function(e) {
+                    // Parse the new index from the slider value
+                    const index = parseInt(e.target.value, 10);
+                    
+                    // Update the current index to the new value
+                    currentIndex = index;
+                    
+                    // Load the DICOM image at the new index
+                    loadDicomImage(index);
+                });
+            });
+ 
             // Implement scrolling to navigate through DICOM files
             $(element).on('mousewheel DOMMouseScroll', function(e) {
                 e.preventDefault();
@@ -55,7 +297,14 @@
                 if (currentIndex >= dicomFiles.length) currentIndex = dicomFiles.length - 1;
                 loadDicomImage(currentIndex);
             });
+
+            function updateProgressBar() {
+                const progressBar = document.getElementById('progress-bar');
+                const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
+                progressBar.style.width = percentage + '%';
+            }
+
         });
-    </script>
+</script>
 </body>
 </html>
