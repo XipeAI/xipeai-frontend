@@ -69,31 +69,27 @@ def remove_spaces_from_folders(root_dir):
 def upload_file():
     if not request.files:
         return 'No file part in the request'
-   
-    # Get the first uploaded file
+
     file = next(request.files.values(), None)
-   
-    if file and file.filename:
-        if file.filename.endswith('.zip'):
-            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(zip_path)
-           
-            # Extract the ZIP file
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(app.config['EXTRACTED_FOLDER'])
-               
-                # Remove spaces from folder names
-                remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'])  
-               
-            return redirect(url_for('index'))
-        else:
-            return 'Invalid file format'
+
+    if file and file.filename and file.filename.endswith('.zip'):
+        # Clear existing content in the EXTRACTED_FOLDER
+        for root, dirs, files in os.walk(app.config['EXTRACTED_FOLDER'], topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+
+        # Save and extract the ZIP file to the EXTRACTED_FOLDER
+        zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(zip_path)
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(app.config['EXTRACTED_FOLDER'])
+
+        return redirect(url_for('index'))
     else:
-        return 'No file selected for upload'
- 
-# @app.route('/dicom/<path:filename>')
-# def serve_dicom_file(filename):
-#     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
+        return 'Invalid file format or no file selected'
+
  
 @app.route('/dicom/<path:filename>')
 def serve_dicom_file(filename):
@@ -144,16 +140,19 @@ def dicom_metadata(filename):
 
     # Extract the metadata from the DICOM file
     ds = pydicom.dcmread(dicom_file_path)
+    print(ds)
 
     # Define which metadata fields you want to extract
     metadata_fields = [
-        ('PatientName', 'Patient Name'), 
+        ('PatientName', 'PatientID'), 
         ('PatientBirthDate', 'Patient Birth Date'), 
         ('BodyPartExamined', 'Body Part Examined'), 
         ('StudyTime', 'Study Time'),
+        ('Result', 'Result'),
         ('AccessionNumber', 'Accession Number'), 
         ('Modality', 'Modality'), 
         ('StudyDescription', 'Study Description')
+        
     ]
 
     # Extract the required metadata fields and preserve order in a list
