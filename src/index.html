@@ -63,7 +63,7 @@
          #slider-container {
             width: 50%;
             border-radius: 5px;
-            margin-top: 20px;
+            margin-top: 15px;
             padding-top: 3px;
             padding-left: 15px;
             padding-right: 15px;
@@ -87,13 +87,13 @@
             line-height: 30px;
             text-align: center;
             font-weight: bold;
-            padding-top: 14px;
+            padding-top: 7px;
+            font-weight: bold;
             box-sizing: border-box;
-            color: #333;
+            color:#009879;
             font-style: normal;
-            font-weight: normal;
             line-height: normal;
-            font-size: 20px;
+            font-size: 15px;
         }
      
      
@@ -296,7 +296,6 @@
             document.getElementById('segmentation-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
         }
 
-
         function applyWindowing() {
                 const element = document.getElementById('dicomViewer');
                 const viewport = cornerstone.getViewport(element);
@@ -312,7 +311,6 @@
                 // Update the viewport with the new settings
                 cornerstone.setViewport(element, viewport);
             }
-
 
         $(document).ready(function() {
             let currentIndex = 0;
@@ -452,10 +450,10 @@
             table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
 
 
-            function updateProgressBar(currentIndex, totalFiles) {
-            const progressPercentage = (currentIndex / totalFiles) * 100;
-            document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
-        }
+                function updateProgressBar(currentIndex, totalFiles) {
+                const progressPercentage = (currentIndex / totalFiles) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
+            }
 
             
             function formatBirthDate(dateString) {
@@ -476,7 +474,7 @@
                 let value = fieldInfo['Value'] !== 'NA' ? fieldInfo['Value'] : getRandomData(fieldInfo['Field']);
                 cellValue.textContent = value;
             });
-         }
+            }
 
             function getRandomData(field) {
                 // Define your dummy data for each field or return a general placeholder
@@ -642,7 +640,7 @@
                 var percent = ((value - rangeSlider.min) / (max - rangeSlider.min));
 
                 // Thumb width adjustment logic
-                var thumbWidth = -15; // Adjust as needed to match your slider's thumb width
+                var thumbWidth = -11; // Adjust as needed to match your slider's thumb width
 
                 // Calculate the new position for the bullet, including the thumbWidth adjustment
                 var bulletPosition = (percent * (rangeSlider.offsetWidth + thumbWidth)) + (thumbWidth / 2);
