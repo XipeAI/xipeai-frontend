@@ -100,23 +100,27 @@ def upload_file():
 
         # Get the list of subfolders
         subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
-        session['subfolders'] = subfolders
+        subfolders = [subfolder for subfolder in subfolders if os.path.dirname(subfolder)]
 
-        # ... (the rest of the code in the upload endpoint if there is more)
+        session['subfolders'] = subfolders
 
         return redirect(url_for('index'))
     else:
         return 'Invalid file format or no file selected'
 
-def get_subfolders(directory, parent_folder=""):
+def get_subfolders(directory, root_dir=None):
+    if root_dir is None:
+        root_dir = directory
+
     subfolders_list = []
-    # Iterate over all the items in directory
     for item in os.scandir(directory):
-        if item.is_dir():  # Check if it is a directory
-            full_path = os.path.join(parent_folder, item.name)
-            subfolders_list.append(full_path)  # Add the subfolder to the list
-            # Recursively check for further subfolders
-            subfolders_list.extend(get_subfolders(item.path, full_path))
+        if item.is_dir():
+            # Recursive call to get subfolders of subfolders
+            subfolder_paths = get_subfolders(item.path, root_dir)
+            # Only add subdirectories that are not the root directory
+            if item.path != root_dir:
+                subfolders_list.append(os.path.relpath(item.path, root_dir))
+            subfolders_list.extend(subfolder_paths)
     return subfolders_list
 
 @app.route('/subfolders', methods=['GET'])

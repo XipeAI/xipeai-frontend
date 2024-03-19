@@ -141,16 +141,22 @@
         /* Style for file input */
         input[type="file"] {
                 display: none; /* Hide the default file input */
+                
         }
        
         .custom-file-upload {
                 border: 1px solid #ccc;
                 display: inline-block;
                 padding: 6px 12px;
+                font-size: medium;
                 cursor: pointer;
+                margin-right: 15px;
                 background-color: #009879; /* Change background color */
                 color: #fff; /* Change text color */
                 border-radius: 4px; /* Add rounded corners */
+                transition: background-color 0.3s ease; 
+                font-weight: bold;
+                
         }
      
         /* Style for upload button */
@@ -161,6 +167,10 @@
                 padding: 10px 20px; /* Adjust padding */
                 border-radius: 4px; /* Add rounded corners */
                 cursor: pointer;
+                font-size: medium;
+                margin-left: 15px;
+                transition: background-color 0.3s ease;
+                font-weight: bold;
         }
      
         input[type="submit"]:hover {
@@ -173,6 +183,48 @@
             align-items: center; /* Center vertically */
             margin-top: 30px;
             margin-bottom: 30px;
+        }
+
+        #subfolder-container {
+            margin: 10px 0;
+            margin-top: 10px;
+            display: flex;
+            color: #009879;
+            justify-content: center; /* Center the dropdown and button */
+            align-items: baseline;
+            font-weight: 600;
+            font-size:large;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+            
+        }
+
+        #subfolder-select, #analyse-btn {
+            padding: 10px;
+            margin-left: 20px;
+            margin-top: 10px;
+            margin-right: 0px; /* Add some space between the select and button */
+            border: 2px solid #009879; /* Add a border matching your theme */
+            border-radius: 5px; /* Rounded corners */
+            background-color: #fff; /* White background for the dropdown */
+            color: #009879; /* Text color to match the theme */
+            font-size: 16px; /* Slightly larger font size for better readability */
+            cursor: pointer; /* Change cursor to indicate clickable items */
+        }
+
+        #subfolder-select:focus, #analyse-btn:focus {
+            outline: none; /* Remove default focus outline */
+            box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+        }
+
+        #analyse-btn {
+            background-color: #009879; /* Match the primary color theme for the button */
+            color: #ffffff; /* White text for the button */
+            font-weight: bold; /* Make button text bold */
+            transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        }
+
+        #analyse-btn:hover {
+            background-color: #006050; /* Darker shade on hover for the button */
         }
     </style>
 </head>
@@ -232,13 +284,14 @@
             const element = document.getElementById('dicomViewer');
             cornerstone.enable(element);
  
-            function loadDicomFilesForSubfolder(subfolder) {
+            function loadDicomImagesForSubfolder(subfolder) {
                 $.getJSON(`/list-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
                     dicomFiles = files;
                     if (dicomFiles.length > 0) {
+                        // Use the first file as an example, you can modify this index
                         const middleIndex = Math.floor(dicomFiles.length / 2);
-                        loadDicomImage(middleIndex); // Load the middle DICOM file in the viewer
-                        updateSlider(dicomFiles.length, middleIndex); // Update the slider with the number of files and set it to the middle
+                        loadDicomImage(middleIndex); // Load the first DICOM file in the viewer
+                        updateSlider(dicomFiles.length, middleIndex); // Update the slider with the number of files
                     } else {
                         console.log("No DICOM files found in the selected subfolder.");
                         clearViewerAndMetadata();
@@ -420,7 +473,7 @@
                 var max = parseInt(rangeSlider.max); // Get the maximum value of the slider
 
                 // Update the bullet with the current value and the total number of DICOM files
-                rangeBullet.innerHTML = (value + 1) + '/' + dicomFiles.length; // Display starts from 1
+                rangeBullet.innerHTML = (value) + '/' + dicomFiles.length; // Display starts from 1
 
                 // Calculate the bullet's position as a percentage
                 var percent = ((value - rangeSlider.min) / (max - rangeSlider.min));
@@ -468,7 +521,7 @@
             $('#analyse-btn').click(function() {
                 var selectedSubfolder = $('#subfolder-select').val();
                 if (selectedSubfolder) {
-                    loadDicomFilesForSubfolder(selectedSubfolder);
+                    loadDicomImagesForSubfolder(selectedSubfolder); // Only load images when the button is clicked
                 } else {
                     alert("Please select a subfolder first.");
                 }
