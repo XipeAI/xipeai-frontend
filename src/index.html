@@ -206,63 +206,65 @@
             let currentIndex = 0;
             let dicomFiles = [];
             let segmentationFiles = []; // Array to store segmentation file paths
+            let lastSegmentationCanvas = null;
 
             const dicomViewerElement = document.getElementById('dicomViewer');
-
             cornerstone.enable(dicomViewerElement);
 
-            function loadDicomImage(imageIndex) {
+            // Listen for image rendered events to redraw the last segmentation
+            $(dicomViewerElement).on('cornerstoneimagerendered', function() {
+                if (lastSegmentationCanvas) {
+                    overlaySegmentationOnDicomViewer(dicomViewerElement, lastSegmentationCanvas);
+                }
+            });
+
+            function loadDicomImage(imageIndex)  {
                 const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
-                console.log(imageId);
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(dicomViewerElement, image);
-                    applyWindowing(dicomViewerElement); // Apply windowing to the DICOM image
-                    // After displaying the DICOM image, overlay the segmentation
+                    applyWindowing(); // Make sure this function is properly defined and applies windowing as expected
                     loadAndOverlaySegmentation(imageIndex);
+                }).catch(function(err) {
+                    console.error(err);
                 });
             }
 
             function loadAndOverlaySegmentation(imageIndex) {
-                // Load the segmentation DICOM similar to the original DICOM
-                const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
-                cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
-                    // Assuming 'pixelData' is your Int16Array from the DICOM segmentation image
-                    const pixelData = segmentationImage.getPixelData();
-                    
-                    // Create a canvas to draw the segmentation overlay
-                    const canvas = document.createElement('canvas');
-                    canvas.width = segmentationImage.width;
-                    canvas.height = segmentationImage.height;
-                    const context = canvas.getContext('2d');
-                    
-                    // Create an ImageData object to hold our colored segmentation
-                    const imageData = context.createImageData(canvas.width, canvas.height);
-                    const data = imageData.data;
+                if (segmentationFiles.length > imageIndex) {
+                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
+                    cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                        const pixelData = segmentationImage.getPixelData();
+                        
+                        const canvas = document.createElement('canvas');
+                        canvas.width = segmentationImage.width;
+                        canvas.height = segmentationImage.height;
+                        const context = canvas.getContext('2d');
+                        
+                        const imageData = context.createImageData(canvas.width, canvas.height);
+                        const data = imageData.data;
 
-                    // Loop through the segmentation data and color-code the pixels
-                    for (let i = 0; i < pixelData.length; i++) {
-                        const index = i * 4; // Index in the RGBA array
-                        if (pixelData[i] === 1) {
-                            // Liver - Color it red
-                            data[index] = 0; // Red
-                            data[index + 1] = 255; // Green
-                            data[index + 2] = 0; // Blue
-                            data[index + 3] = 64; // Alpha (half transparent)
-                        } else if (pixelData[i] === 2) {
-                            // Tumor - Color it green
-                            data[index] = 255; // Red
-                            data[index + 1] = 0; // Green
-                            data[index + 2] = 0; // Blue
-                            data[index + 3] = 128; // Alpha (half transparent)
+                        for (let i = 0; i < pixelData.length; i++) {
+                            const index = i * 4; 
+                            if (pixelData[i] === 1) { // Liver, for example
+                                data[index] = 0;
+                                data[index + 1] = 255;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            } else if (pixelData[i] === 2) { // Tumor, for example
+                                data[index] = 255;
+                                data[index + 1] = 0;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            }
                         }
-                    }
 
-                    // Put the colored segmentation data back on the canvas
-                    context.putImageData(imageData, 0, 0);
-
-                    // Now overlay this canvas onto the original DICOM viewer element
-                    overlaySegmentationOnDicomViewer(dicomViewerElement, canvas);
-                });
+                        context.putImageData(imageData, 0, 0);
+                        lastSegmentationCanvas = canvas;
+                        overlaySegmentationOnDicomViewer(dicomViewerElement, canvas);
+                    }).catch(function(error) {
+                        console.error('Error loading segmentation image:', error);
+                    });
+                }
             }
 
             function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
@@ -274,9 +276,20 @@
 
                 const ctx = cornerstoneCanvas.getContext('2d');
                 ctx.drawImage(segmentationCanvas, 0, 0);
+                cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
             }
 
-
+        function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+            // This ensures we're drawing on top of the loaded DICOM image
+            const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+            if (cornerstoneCanvas) {
+                const ctx = cornerstoneCanvas.getContext('2d');
+                ctx.drawImage(segmentationCanvas, 0, 0);
+                cornerstone.updateImage(dicomViewerElement);
+            } else {
+                console.error('DICOM Viewer canvas not found.');
+            }
+}
  
             function populateMetadataTable(metadata) {
             const table = document.getElementById('dicom-metadata-table');
@@ -355,10 +368,10 @@
             // Fetch the list of segmentation files
             $.getJSON('/list-segmentation-files', function(files) {
                 segmentationFiles = files;
-                if (segmentationFiles.length > 0) {
-                    loadSegmentationImage(0); // Load the first segmentation image
+                // if (segmentationFiles.length > 0) {
+                //     loadSegmentationImage(0); // Load the first segmentation image
                     
-                }
+                // }
             });
 
             // Slider event listener
@@ -368,7 +381,6 @@
                 const index = parseInt(e.target.value, 10);
                 currentIndex = index;
                 loadDicomImage(index);
-                loadSegmentationImage(index); // Update the segmentation viewer as well
                 updateProgressBar(currentIndex, dicomFiles.length); // Updated to call with the correct parameters
             });
  
@@ -378,7 +390,6 @@
                 const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
                 currentIndex = Math.max(0, Math.min(currentIndex + (delta > 0 ? -1 : 1), dicomFiles.length - 1));
                 loadDicomImage(currentIndex);
-                loadSegmentationImage(currentIndex);
                 updateProgressBar(currentIndex, dicomFiles.length); // Ensure the progress bar is updated on scroll
             });
 
