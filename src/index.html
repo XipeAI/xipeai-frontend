@@ -48,7 +48,7 @@
         #dicomViewer {
             flex: 1; /* Allocate half of the available space */
             width: 50%; /* Adjust width if necessary */
-            height: 400px; /* New height for the DICOM viewer */
+            height: 500px; /* New height for the DICOM viewer */
             display: flex; /* Use flexbox for centering the content */
             justify-content: center; /* Center horizontally in the flex container */
             align-items: center; /* Center vertically in the flex container */
@@ -297,10 +297,6 @@
     <span id="rs-bullet" class="rs-label">0 / 0</span>
 
     <script>
-        let currentIndex = 0;
-        let dicomFiles = [];
-        let segmentationFiles = [];
-        let lastSegmentationCanvas = null;
 
         function updateFileName(input) {
             document.getElementById('file-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
@@ -327,8 +323,12 @@
             }
 
         $(document).ready(function() {
+            let currentIndex = 0;
+            let dicomFiles = [];
             const element = document.getElementById('dicomViewer');
             cornerstone.enable(element);
+            let segmentationFiles = [];
+            let lastSegmentationCanvas = null;
 
             // Listen for image rendered events to redraw the last segmentation
             $(element).on('cornerstoneimagerendered', function() {
@@ -338,7 +338,7 @@
             });
  
             function loadDicomImagesForSubfolder(subfolder) {
-                $.getJSON(`/list-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+                $.getJSON(`/list-dicom-files?subfolder=${subfolder}`, function(files) {
                     dicomFiles = files;
                     if (dicomFiles.length > 0) {
                         // Use the first file as an example, you can modify this index
@@ -393,9 +393,8 @@
 
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
-                    applyWindowing()
-                    console.log(segmentationFiles)
-                    loadAndOverlaySegmentation(imageIndex)
+                    applyWindowing(); // Make sure this function is properly defined and applies windowing as expected
+                    loadAndOverlaySegmentation(imageIndex);
                     fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
@@ -469,10 +468,10 @@
                     console.error('DICOM Viewer canvas not found.');
                 }
             }
-
+ 
             function populateMetadataTable(metadata) {
-                const table = document.getElementById('dicom-metadata-table');
-                table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
+            const table = document.getElementById('dicom-metadata-table');
+            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
 
 
                 function updateProgressBar(currentIndex, totalFiles) {
@@ -564,11 +563,58 @@
                 segmentationFiles = files;
                 // if (segmentationFiles.length > 0) {
                 //     loadSegmentationImage(0); // Load the first segmentation image
+                    
+                // }
+            });
 
+            // Slider event listener
+            const slider = document.getElementById('dicom-slider');
+            // Slider event listener
+            slider.addEventListener('input', function(e) {
+                const index = parseInt(e.target.value, 10);
+                currentIndex = index;
+                loadDicomImage(index);
+                updateProgressBar(currentIndex, dicomFiles.length); // Updated to call with the correct parameters
+                // Calculate the initial index to start at the middle of the DICOM files list
+                const initialIndex = Math.floor(dicomFiles.length / 2);
+
+                const slider = document.getElementById('dicom-slider');
+                slider.max = dicomFiles.length - 1;
+                slider.value = initialIndex; // Set slider position to the middle
+
+                // Load the DICOM image at the initial index (middle of the list)
+                loadDicomImage(initialIndex);
+
+                // Set the initial value display
+                showSliderValue(); // <-- This is the new position of the call
+
+                // slider.addEventListener('input', function() {
+                //     loadDicomImage(parseInt(this.value, 10));
+                //     showSliderValue(); 
+                // });
+                // }   else {
+                //     // Handle the case where there are no DICOM files
+                //     rangeBullet.innerHTML = '0 / 0';
                 // }
             });
 
  
+            // // Adjusted scrolling event listener
+            // $(dicomViewerElement).on('mousewheel DOMMouseScroll', function(e) {
+            //     e.preventDefault();
+            //     const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
+            //     currentIndex = Math.max(0, Math.min(currentIndex + (delta > 0 ? -1 : 1), dicomFiles.length - 1));
+            //     loadDicomImage(currentIndex);
+            //     updateProgressBar(currentIndex, dicomFiles.length); // Ensure the progress bar is updated on scroll
+            // });
+
+            function updateProgressBar(currentIndex, totalFiles) {
+                // Adjusted to account for zero-based indexing; ensures the first image shows some progress and the last image fills the bar
+                const progressPercentage = ((currentIndex + 1) / totalFiles) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
+            }
+            
+
             $(element).on('mousewheel DOMMouseScroll', function(e) {
                 e.preventDefault(); // Prevent the default scroll behavior
 
@@ -591,11 +637,11 @@
             });
 
 
-            function updateProgressBar() {
-                const progressBar = document.getElementById('progress-bar');
-                const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
-                progressBar.style.width = percentage + '%';
-            }
+            // function updateProgressBar() {
+            //     const progressBar = document.getElementById('progress-bar');
+            //     const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
+            //     progressBar.style.width = percentage + '%';
+            // }
 
             var rangeSlider = document.getElementById("dicom-slider");
             var rangeBullet = document.getElementById("rs-bullet");
