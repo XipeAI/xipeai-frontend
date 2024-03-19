@@ -53,19 +53,6 @@
             padding: 10px; /* Space inside the viewer */
         }
 
-        /* DICOM Viewer styles */
-        #segmentationViewer {
-            flex: 1; /* Allocate half of the available space */
-            width: 50%; /* Adjust width if necessary */
-            height: 500px; /* New height for the DICOM viewer */
-            display: flex; /* Use flexbox for centering the content */
-            justify-content: center; /* Center horizontally in the flex container */
-            align-items: center; /* Center vertically in the flex container */
-            border: 1px solid #ddd; /* A light grey border */
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* A subtle shadow for depth */
-            padding: 10px; /* Space inside the viewer */
-        }
-
          /* Slider styles */
          #slider-container {
             width: 100%;
@@ -178,8 +165,6 @@
     <div id="layout">
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
-        <div id="segmentationViewer"></div>
-
 
         <!-- DICOM Metadata Table -->
         <table id="dicom-metadata-table">
@@ -216,31 +201,6 @@
                 cornerstone.setViewport(element, viewport);
             }
 
-        function applyCanvasGammaCorrection(element, gamma) {
-                const canvas = element.querySelector('canvas');
-                if (!canvas) return;
-
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data; // RGBA array
-
-                for (let i = 0; i < data.length; i += 4) {
-                    // Apply gamma correction to each channel
-                    data[i] = 1; // Red
-                    data[i + 1] = 1; // Green
-                    data[i + 2] = 1; // Blue
-                    data[i +3] = 1;
-                }
-
-                console.log(imageData.data)
-
-                ctx.putImageData(imageData, 0, 0);
-            }
-
-
-// Assuming you have the pixel data and dimensions ready
-// Example: applyPseudoColoring(yourPixelDataArray, 512, 512);
-
 
         $(document).ready(function() {
             let currentIndex = 0;
@@ -248,10 +208,8 @@
             let segmentationFiles = []; // Array to store segmentation file paths
 
             const dicomViewerElement = document.getElementById('dicomViewer');
-            const segmentationViewerElement = document.getElementById('segmentationViewer'); // Get the segmentation viewer element
 
             cornerstone.enable(dicomViewerElement);
-            cornerstone.enable(segmentationViewerElement); // Enable Cornerstone on the segmentation viewer
 
             function loadDicomImage(imageIndex) {
                 const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
@@ -259,31 +217,65 @@
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(dicomViewerElement, image);
                     applyWindowing(dicomViewerElement); // Apply windowing to the DICOM image
+                    // After displaying the DICOM image, overlay the segmentation
+                    loadAndOverlaySegmentation(imageIndex);
                 });
             }
 
-            function loadSegmentationImage(imageIndex) {
-                if (segmentationFiles.length > imageIndex) { // Check if segmentation file exists for the current index
-                    const imageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
-                    console.log(imageId);
-                    cornerstone.loadImage(imageId).then(function(image) {
-                        // Assuming 'pixelData' is your Int16Array from the DICOM image
-                        const pixelData = image.imageFrame.pixelData; // Or however you access your Int16Array
+            function loadAndOverlaySegmentation(imageIndex) {
+                // Load the segmentation DICOM similar to the original DICOM
+                const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
+                cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                    // Assuming 'pixelData' is your Int16Array from the DICOM segmentation image
+                    const pixelData = segmentationImage.getPixelData();
+                    
+                    // Create a canvas to draw the segmentation overlay
+                    const canvas = document.createElement('canvas');
+                    canvas.width = segmentationImage.width;
+                    canvas.height = segmentationImage.height;
+                    const context = canvas.getContext('2d');
+                    
+                    // Create an ImageData object to hold our colored segmentation
+                    const imageData = context.createImageData(canvas.width, canvas.height);
+                    const data = imageData.data;
 
-                        // Convert the Int16Array to a regular array for processing
-                        const pixelArray = Array.from(pixelData);
+                    // Loop through the segmentation data and color-code the pixels
+                    for (let i = 0; i < pixelData.length; i++) {
+                        const index = i * 4; // Index in the RGBA array
+                        if (pixelData[i] === 1) {
+                            // Liver - Color it red
+                            data[index] = 0; // Red
+                            data[index + 1] = 255; // Green
+                            data[index + 2] = 0; // Blue
+                            data[index + 3] = 64; // Alpha (half transparent)
+                        } else if (pixelData[i] === 2) {
+                            // Tumor - Color it green
+                            data[index] = 255; // Red
+                            data[index + 1] = 0; // Green
+                            data[index + 2] = 0; // Blue
+                            data[index + 3] = 128; // Alpha (half transparent)
+                        }
+                    }
 
-                        // Use a Set to find unique values (Sets automatically remove duplicates)
-                        const uniqueValues = new Set(pixelArray);
+                    // Put the colored segmentation data back on the canvas
+                    context.putImageData(imageData, 0, 0);
 
-                        // Convert the Set back to an Array to work with the unique values
-                        const uniqueValuesArray = Array.from(uniqueValues);
-
-                        console.log("Unique pixel values:", uniqueValuesArray);
-                        cornerstone.displayImage(segmentationViewerElement, image);
-                    });
-                }
+                    // Now overlay this canvas onto the original DICOM viewer element
+                    overlaySegmentationOnDicomViewer(dicomViewerElement, canvas);
+                });
             }
+
+            function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+                const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+                if (!cornerstoneCanvas) {
+                    console.error('DICOM Viewer canvas not found.');
+                    return;
+                }
+
+                const ctx = cornerstoneCanvas.getContext('2d');
+                ctx.drawImage(segmentationCanvas, 0, 0);
+            }
+
 
  
             function populateMetadataTable(metadata) {
