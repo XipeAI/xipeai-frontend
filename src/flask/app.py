@@ -1,18 +1,24 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session
 from flask_cors import CORS
 import zipfile
 import shutil
 from werkzeug.utils import safe_join
 import pydicom
 from pydicom.data import get_testdata_files
- 
+import secrets
+from urllib.parse import unquote
+
+
 app = Flask(__name__)
 CORS(app, origins=["http://127.0.0.1:5000"])
 UPLOAD_FOLDER = 'uploads'
 EXTRACTED_FOLDER = 'extracted'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
+secret_key = secrets.token_urlsafe(24)
+app.secret_key = secret_key  
+
 
 @app.route('/dicom-metadata/dummy')
 def dicom_metadata_dummy():
@@ -45,26 +51,29 @@ def index():
     return send_from_directory(src_dir, 'index.html')
  
 def remove_spaces_from_folders(root_dir):
-    for dirpath, dirnames, _ in os.walk(root_dir, topdown=False):
+    for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
+        # Rename files with spaces
+        for filename in filenames:
+            if ' ' in filename:
+                new_filename = filename.replace(' ', '_')
+                old_file_path = os.path.join(dirpath, filename)
+                new_file_path = os.path.join(dirpath, new_filename)
+                os.rename(old_file_path, new_file_path)
+
+        # Rename directories with spaces
         for dirname in dirnames:
             if ' ' in dirname:
                 new_dirname = dirname.replace(' ', '_')
-                old_path = os.path.join(dirpath, dirname)
-                new_path = os.path.join(dirpath, new_dirname)
-               
-                # If the target directory exists and is not the same as the current directory, attempt merge or rename
-                if os.path.exists(new_path) and old_path != new_path:
-                    try:
-                        # Attempt to merge contents safely or consider other logic here
-                        print(f"Directory already exists: {new_path}. Consider merging or handling differently.")
-                    except OSError as e:
-                        print(f"Error renaming {old_path} to {new_path}: {e}")
+                old_dir_path = os.path.join(dirpath, dirname)
+                new_dir_path = os.path.join(dirpath, new_dirname)
+                
+                # Rename the directory
+                if not os.path.exists(new_dir_path):
+                    os.rename(old_dir_path, new_dir_path)
                 else:
-                    try:
-                        os.rename(old_path, new_path)
-                    except OSError as e:
-                        print(f"Error renaming {old_path} to {new_path}: {e}")
- 
+                    print(f"Directory cannot be renamed because {new_dir_path} already exists")
+
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if not request.files:
@@ -86,40 +95,80 @@ def upload_file():
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(app.config['EXTRACTED_FOLDER'])
 
+        # After extracting files:
+        remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'])
+
+        # Get the list of subfolders
+        subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
+        session['subfolders'] = subfolders
+
+        # ... (the rest of the code in the upload endpoint if there is more)
+
         return redirect(url_for('index'))
     else:
         return 'Invalid file format or no file selected'
 
+def get_subfolders(directory, parent_folder=""):
+    subfolders_list = []
+    # Iterate over all the items in directory
+    for item in os.scandir(directory):
+        if item.is_dir():  # Check if it is a directory
+            full_path = os.path.join(parent_folder, item.name)
+            subfolders_list.append(full_path)  # Add the subfolder to the list
+            # Recursively check for further subfolders
+            subfolders_list.extend(get_subfolders(item.path, full_path))
+    return subfolders_list
+
+@app.route('/subfolders', methods=['GET'])
+def get_subfolders_route():
+    # Return the list of subfolders stored in the session
+    return jsonify(session.get('subfolders', []))
  
 @app.route('/dicom/<path:filename>')
 def serve_dicom_file(filename):
-    # Base directory where DICOM files are stored
+    # Log the received filename for debugging
+    print(f"Requested file: {filename}")
+
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
-   
-    # Create a secure, absolute file path
     file_path = safe_join(base_dir, filename)
-   
+
+    # Log the absolute file path for debugging
+    print(f"Full file path: {file_path}")
+
     if not os.path.exists(file_path):
         return "File not found", 404
-   
-    # Serve the file from its directory
+    
     return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
- 
- 
+
+
+
+
 @app.route('/list-dicom-files')
 def list_dicom_files():
+    selected_subfolder = request.args.get('subfolder')
+    print(f"Requested subfolder: {selected_subfolder}")  # For debugging
+
+    if selected_subfolder is None:
+        return jsonify({"error": "No subfolder provided"}), 400
+    
+    # Ensure the subfolder exists
+    subfolder_path = os.path.join(app.config['EXTRACTED_FOLDER'], selected_subfolder)
+    if not os.path.exists(subfolder_path):
+        return jsonify({"error": "Subfolder not found"}), 404
+
+    # List DICOM files
     dicom_files = []
-    for root, dirs, files in os.walk(app.config['EXTRACTED_FOLDER']):
+    for root, dirs, files in os.walk(subfolder_path):
         for file in files:
             if file.lower().endswith('.dcm'):
                 # Generate a relative path to the file from the EXTRACTED_FOLDER
-                relative_path = os.path.relpath(os.path.join(root, file), start=app.config['EXTRACTED_FOLDER'])
+                relative_path = os.path.relpath(os.path.join(root, file), start=root)
                 dicom_files.append(relative_path)
- 
+
     # Sort the list of DICOM files alphabetically by their relative paths
     dicom_files.sort()
- 
     return jsonify(dicom_files)
+
  
 @app.after_request
 def after_request(response):
