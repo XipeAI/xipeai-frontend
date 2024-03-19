@@ -44,7 +44,7 @@
         #dicomViewer {
             flex: 1; /* Allocate half of the available space */
             width: 50%; /* Adjust width if necessary */
-            height: 350px; /* New height for the DICOM viewer */
+            height: 500px; /* New height for the DICOM viewer */
             display: flex; /* Use flexbox for centering the content */
             justify-content: center; /* Center horizontally in the flex container */
             align-items: center; /* Center vertically in the flex container */
@@ -147,6 +147,21 @@
         <input type="submit" value="Upload">
     </form>
 
+    <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
+        <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
+        <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
+        <span id="segmentation-name">No file chosen</span>
+        <input type="submit" value="Upload">
+    </form>
+
+    <!-- Windowing Controls -->
+    <div id="windowing-controls">
+        <label for="window-width">Window Width:</label>
+        <input type="range" id="window-width" min="1" max="4000" value="150" onchange="applyWindowing()">
+        <label for="window-level">Window Level:</label>
+        <input type="range" id="window-level" min="-1024" max="3071" value="60" onchange="applyWindowing()">
+    </div>
+
     <div id="layout">
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
@@ -164,34 +179,123 @@
     </div>
  
     <script>
-        let currentIndex = 0;
-        let dicomFiles = [];
 
         function updateFileName(input) {
             document.getElementById('file-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
         }
 
+        function updateSegmentationName(input) {
+            document.getElementById('segmentation-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
+        }
+
+
+        function applyWindowing() {
+                const element = document.getElementById('dicomViewer');
+                const viewport = cornerstone.getViewport(element);
+
+                // Retrieve the window width and window level from the input sliders
+                const windowWidth = document.getElementById('window-width').value;
+                const windowLevel = document.getElementById('window-level').value;
+
+                // Apply the windowing parameters
+                viewport.voi.windowWidth = parseInt(windowWidth, 10);
+                viewport.voi.windowCenter = parseInt(windowLevel, 10);
+
+                // Update the viewport with the new settings
+                cornerstone.setViewport(element, viewport);
+            }
+
+
         $(document).ready(function() {
-            const element = document.getElementById('dicomViewer');
-            cornerstone.enable(element);
- 
-        
+            let currentIndex = 0;
+            let dicomFiles = [];
+            let segmentationFiles = []; // Array to store segmentation file paths
+            let lastSegmentationCanvas = null;
 
-        function loadDicomImage(imageIndex) {
-            const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
-            cornerstone.loadImage(imageId).then(function(image) {
-                cornerstone.displayImage(element, image);
-                // Populate the metadata table for the current image
-                fetchAndDisplayMetadata(dicomFiles[currentIndex]);
+            const dicomViewerElement = document.getElementById('dicomViewer');
+            cornerstone.enable(dicomViewerElement);
 
-                const slider = document.getElementById('dicom-slider');
-                slider.max = dicomFiles.length - 1;
-                slider.value = imageIndex;
+            // Listen for image rendered events to redraw the last segmentation
+            $(dicomViewerElement).on('cornerstoneimagerendered', function() {
+                if (lastSegmentationCanvas) {
+                    overlaySegmentationOnDicomViewer(dicomViewerElement, lastSegmentationCanvas);
+                }
             });
-}
 
+            function loadDicomImage(imageIndex)  {
+                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
+                cornerstone.loadImage(imageId).then(function(image) {
+                    cornerstone.displayImage(dicomViewerElement, image);
+                    applyWindowing(); // Make sure this function is properly defined and applies windowing as expected
+                    loadAndOverlaySegmentation(imageIndex);
+                }).catch(function(err) {
+                    console.error(err);
+                });
+            }
+
+            function loadAndOverlaySegmentation(imageIndex) {
+                if (segmentationFiles.length > imageIndex) {
+                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
+                    cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                        const pixelData = segmentationImage.getPixelData();
+                        
+                        const canvas = document.createElement('canvas');
+                        canvas.width = segmentationImage.width;
+                        canvas.height = segmentationImage.height;
+                        const context = canvas.getContext('2d');
+                        
+                        const imageData = context.createImageData(canvas.width, canvas.height);
+                        const data = imageData.data;
+
+                        for (let i = 0; i < pixelData.length; i++) {
+                            const index = i * 4; 
+                            if (pixelData[i] === 1) { // Liver, for example
+                                data[index] = 0;
+                                data[index + 1] = 255;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            } else if (pixelData[i] === 2) { // Tumor, for example
+                                data[index] = 255;
+                                data[index + 1] = 0;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            }
+                        }
+
+                        context.putImageData(imageData, 0, 0);
+                        lastSegmentationCanvas = canvas;
+                        overlaySegmentationOnDicomViewer(dicomViewerElement, canvas);
+                    }).catch(function(error) {
+                        console.error('Error loading segmentation image:', error);
+                    });
+                }
+            }
+
+            function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+                const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+                if (!cornerstoneCanvas) {
+                    console.error('DICOM Viewer canvas not found.');
+                    return;
+                }
+
+                const ctx = cornerstoneCanvas.getContext('2d');
+                ctx.drawImage(segmentationCanvas, 0, 0);
+                cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
+            }
+
+        function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+            // This ensures we're drawing on top of the loaded DICOM image
+            const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+            if (cornerstoneCanvas) {
+                const ctx = cornerstoneCanvas.getContext('2d');
+                ctx.drawImage(segmentationCanvas, 0, 0);
+                cornerstone.updateImage(dicomViewerElement);
+            } else {
+                console.error('DICOM Viewer canvas not found.');
+            }
+}
  
-        function populateMetadataTable(metadata) {
+            function populateMetadataTable(metadata) {
             const table = document.getElementById('dicom-metadata-table');
             // Clear existing table rows, except for the header
             table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
@@ -259,49 +363,44 @@
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
                 dicomFiles = files;
-                
-                // Check if there are any DICOM files returned
                 if (dicomFiles.length > 0) {
-                    // Load the first image initially
-                    loadDicomImage(0);
+                    loadDicomImage(0); // Load the first DICOM image
+                    updateProgressBar(currentIndex, dicomFiles.length); // Set initial progress bar status
                 }
+            });
 
-                // Get the slider element from the DOM
-                const slider = document.getElementById('dicom-slider');
-                
-                // Initialize the slider's maximum range based on the number of DICOM files
-                slider.max = dicomFiles.length - 1;
-                
-                // Set the slider's current value to 0 (first image)
-                slider.value = 0;
+            // Fetch the list of segmentation files
+            $.getJSON('/list-segmentation-files', function(files) {
+                segmentationFiles = files;
+                // if (segmentationFiles.length > 0) {
+                //     loadSegmentationImage(0); // Load the first segmentation image
+                    
+                // }
+            });
 
-                // Attach an event listener to the slider to load the image when the slider value changes
-                slider.addEventListener('input', function(e) {
-                    // Parse the new index from the slider value
-                    const index = parseInt(e.target.value, 10);
-                    
-                    // Update the current index to the new value
-                    currentIndex = index;
-                    
-                    // Load the DICOM image at the new index
-                    loadDicomImage(index);
-                });
+            // Slider event listener
+            const slider = document.getElementById('dicom-slider');
+            // Slider event listener
+            slider.addEventListener('input', function(e) {
+                const index = parseInt(e.target.value, 10);
+                currentIndex = index;
+                loadDicomImage(index);
+                updateProgressBar(currentIndex, dicomFiles.length); // Updated to call with the correct parameters
             });
  
-            // Implement scrolling to navigate through DICOM files
-            $(element).on('mousewheel DOMMouseScroll', function(e) {
+            // Adjusted scrolling event listener
+            $(dicomViewerElement).on('mousewheel DOMMouseScroll', function(e) {
                 e.preventDefault();
                 const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
-                currentIndex += delta > 0 ? -1 : 1;
-                if (currentIndex < 0) currentIndex = 0;
-                if (currentIndex >= dicomFiles.length) currentIndex = dicomFiles.length - 1;
+                currentIndex = Math.max(0, Math.min(currentIndex + (delta > 0 ? -1 : 1), dicomFiles.length - 1));
                 loadDicomImage(currentIndex);
+                updateProgressBar(currentIndex, dicomFiles.length); // Ensure the progress bar is updated on scroll
             });
 
-            function updateProgressBar() {
-                const progressBar = document.getElementById('progress-bar');
-                const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
-                progressBar.style.width = percentage + '%';
+            function updateProgressBar(currentIndex, totalFiles) {
+                // Adjusted to account for zero-based indexing; ensures the first image shows some progress and the last image fills the bar
+                const progressPercentage = ((currentIndex + 1) / totalFiles) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
             }
 
         });
