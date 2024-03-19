@@ -254,12 +254,22 @@
     <button id="analyse-btn">Analyse</button>
 </div>
 
+<div id="form-container"></div>
     <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
         <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
         <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
         <span id="segmentation-name">No file chosen</span>
         <input type="submit" value="Upload">
     </form>
+</div>
+
+<div id="segmentation-subfolder-container">
+    <label for="segmentation-subfolder-select">Select Segmentation Subfolder:</label>
+    <select id="segmentation-subfolder-select">
+        <!-- Segmentation subfolders will be dynamically populated here -->
+    </select>
+    <button id="analyse-segmentation-btn">Analyse Segmentation</button>
+</div>
 
     <!-- Windowing Controls -->
     <div id="windowing-controls">
@@ -345,6 +355,17 @@
                 });
             }
 
+            function loadSegmentationImagesForSubfolder(subfolder) {
+                $.getJSON(`/list-segmentation-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+                    segmentationFiles = files;
+                    if(segmentationFiles.length === 0) {
+                        console.log("No segmentation files found in the selected subfolder.");
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error("Failed to load segmentation files list for the selected subfolder:", textStatus, errorThrown);
+                });
+            }
+
             function updateSlider(numFiles, middleIndex) {
                 const slider = document.getElementById('dicom-slider');
                 slider.max = numFiles - 1;
@@ -373,6 +394,8 @@
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
                     applyWindowing()
+                    console.log(segmentationFiles)
+                    loadAndOverlaySegmentation(imageIndex)
                     fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
@@ -384,7 +407,10 @@
 
             function loadAndOverlaySegmentation(imageIndex) {
                 if (segmentationFiles.length > imageIndex) {
-                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${segmentationFiles[imageIndex]}`;
+                    const subfolder = $('#segmentation-subfolder-select').val(); 
+                    const filename = segmentationFiles[imageIndex];
+                    console.log(segmentationFiles)
+                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
                     cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                         const pixelData = segmentationImage.getPixelData();
                         
@@ -420,17 +446,17 @@
                 }
             }
 
-            function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
-                const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
-                if (!cornerstoneCanvas) {
-                    console.error('DICOM Viewer canvas not found.');
-                    return;
-                }
+            // function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+            //     const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+            //     if (!cornerstoneCanvas) {
+            //         console.error('DICOM Viewer canvas not found.');
+            //         return;
+            //     }
 
-                const ctx = cornerstoneCanvas.getContext('2d');
-                ctx.drawImage(segmentationCanvas, 0, 0);
-                cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
-            }
+            //     const ctx = cornerstoneCanvas.getContext('2d');
+            //     ctx.drawImage(segmentationCanvas, 0, 0);
+            //     cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
+            // }
 
             function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
                 // This ensures we're drawing on top of the loaded DICOM image
@@ -615,31 +641,49 @@
 
             $('#subfolder-select').change(function() {
                 const selectedSubfolder = $(this).val();
-                loadDicomFilesForSubfolder(selectedSubfolder); // Trigger loading DICOM files for the selected subfolder
+                loadDicomImagesForSubfolder(selectedSubfolder); // Trigger loading DICOM files for the selected subfolder
             });
 
-
-            // Add this inside the $(document).ready function
-            $.getJSON('/subfolders', function(subfolders) {
-                const subfolderSelect = document.getElementById('subfolder-select');
-                subfolders.forEach(function(subfolder) {
+            $.getJSON('/subfolders', function(data) {
+                const dicomSubfolderSelect = document.getElementById('subfolder-select');
+                data.dicom_subfolders.forEach(function(subfolder) {
                     const option = document.createElement('option');
                     option.value = subfolder;
                     option.textContent = subfolder;
-                    subfolderSelect.appendChild(option);
+                    dicomSubfolderSelect.appendChild(option);
+                });
+
+                const segmentationSubfolderSelect = document.getElementById('segmentation-subfolder-select');
+                data.segmentation_subfolders.forEach(function(subfolder) {
+                    const option = document.createElement('option');
+                    option.value = subfolder;
+                    option.textContent = subfolder;
+                    segmentationSubfolderSelect.appendChild(option);
                 });
             });
+
+            
             
             // Event listener for the Analyse button
-            $('#analyse-btn').click(function() {
-                var selectedSubfolder = $('#subfolder-select').val();
+            $('#analyse-dicom-btn').click(function() {
+                var selectedSubfolder = $('#dicom-subfolder-select').val();
                 if (selectedSubfolder) {
                     loadDicomImagesForSubfolder(selectedSubfolder); // Only load images when the button is clicked
                 } else {
-                    alert("Please select a subfolder first.");
+                    alert("Please select a DICOM subfolder first.");
                 }
             });
 
+            $('#analyse-segmentation-btn').click(function() {
+                var selectedSubfolder = $('#segmentation-subfolder-select').val();
+                if (selectedSubfolder) {
+                    // Load and display segmentation images or perform necessary analysis
+                    // This function needs to be defined or updated to handle segmentation files
+                    loadSegmentationImagesForSubfolder(selectedSubfolder); 
+                } else {
+                    alert("Please select a segmentation subfolder first.");
+                }
+            });
 
         });
         

@@ -103,10 +103,9 @@ def upload_file():
         remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'])
 
         # Get the list of subfolders
-        subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
-        subfolders = [subfolder for subfolder in subfolders if os.path.dirname(subfolder)]
+        dicom_subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
+        session['dicom_subfolders'] = dicom_subfolders  # Only update the DICOM subfolders
 
-        session['subfolders'] = subfolders
 
         return redirect(url_for('index'))
     else:
@@ -137,10 +136,8 @@ def upload_segmentation_file():
         remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
 
         # Get the list of subfolders
-        subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
-        subfolders = [subfolder for subfolder in subfolders if os.path.dirname(subfolder)]
-
-        session['subfolders'] = subfolders
+        segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
+        session['segmentation_subfolders'] = segmentation_subfolders  # Only update the segmentation subfolders
 
         return redirect(url_for('index'))
     else:
@@ -163,8 +160,13 @@ def get_subfolders(directory, root_dir=None):
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
-    # Return the list of subfolders stored in the session
-    return jsonify(session.get('subfolders', []))
+    # Return the list of DICOM subfolders stored in the session
+    dicom_subfolders = session.get('dicom_subfolders', [])
+    segmentation_subfolders = session.get('segmentation_subfolders', [])
+    return jsonify({
+        'dicom_subfolders': dicom_subfolders,
+        'segmentation_subfolders': segmentation_subfolders
+    })
  
 @app.route('/dicom/<path:filename>')
 def serve_dicom_file(filename):
@@ -187,7 +189,7 @@ def serve_segmentation_file(filename):
     # Log the received filename for debugging
     print(f"Requested file: {filename}")
 
-    base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
+    base_dir = os.path.abspath(app.config['SEGMENTED_FOLDER'])
     file_path = safe_join(base_dir, filename)
 
     # Log the absolute file path for debugging
@@ -234,7 +236,7 @@ def list_segmentation_files():
         return jsonify({"error": "No subfolder provided"}), 400
     
     # Ensure the subfolder exists
-    subfolder_path = os.path.join(app.config['EXTRACTED_FOLDER'], selected_subfolder)
+    subfolder_path = os.path.join(app.config['SEGMENTED_FOLDER'], selected_subfolder)
     if not os.path.exists(subfolder_path):
         return jsonify({"error": "Subfolder not found"}), 404
 
