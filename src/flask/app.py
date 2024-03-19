@@ -176,12 +176,12 @@ def after_request(response):
     print(response.headers)
     return response
  
-@app.route('/dicom-metadata/<path:filename>')
-def dicom_metadata(filename):
+@app.route('/dicom-metadata/<path:filepath>')
+def dicom_metadata(filepath):
     # Base directory where DICOM files are stored
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
     # Create a secure, absolute file path
-    dicom_file_path = safe_join(base_dir, filename)
+    dicom_file_path = safe_join(base_dir, filepath)
 
     # Ensure the file exists
     if not os.path.exists(dicom_file_path):
@@ -189,7 +189,6 @@ def dicom_metadata(filename):
 
     # Extract the metadata from the DICOM file
     ds = pydicom.dcmread(dicom_file_path)
-    print(ds)
 
     # Define which metadata fields you want to extract
     metadata_fields = [
@@ -203,7 +202,6 @@ def dicom_metadata(filename):
         ('StudyDescription', 'Study Description')
         
     ]
-
     # Extract the required metadata fields and preserve order in a list
     ordered_metadata = [
         {"Field": display, "Value": str(getattr(ds, tag, 'NA'))}

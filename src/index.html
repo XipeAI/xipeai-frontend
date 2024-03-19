@@ -270,11 +270,13 @@
                 if (dicomFiles.length === 0) return;
 
                 imageIndex = Math.max(0, Math.min(imageIndex, dicomFiles.length - 1));
-                const subfolder = $('#subfolder-select').val();
-                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${dicomFiles[imageIndex]}`;
+                const subfolder = $('#subfolder-select').val(); 
+                const filename = dicomFiles[imageIndex];
+                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${filename}`;
 
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
+                    fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
                 });
@@ -287,33 +289,8 @@
  
         function populateMetadataTable(metadata) {
             const table = document.getElementById('dicom-metadata-table');
-            // Clear existing table rows, except for the header
-            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
+            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
 
-            // Helper function to generate random data for demonstration purposes
-            function getRandomData(field) {
-                switch(field) {
-                    case 'Patient Name':
-                        return 'John Doe';
-                    case 'Patient Birth Date':
-                        return '1980-01-01'; // Default random birth date
-                    case 'Body Part Examined':
-                        return 'Head';
-                    case 'Study Time':
-                        return '14:30:00';
-                    case 'Accession Number':
-                        return Math.random().toString().slice(2, 10);
-                    case 'Modality':
-                        return 'CT';
-                    case 'Result':
-                        return 'Critical';
-                    case 'Study Description':
-                        return 'Routine checkup';
-            
-                    default:
-                        return 'Random Value';
-                }
-            }
 
             function updateProgressBar(currentIndex, totalFiles) {
             const progressPercentage = (currentIndex / totalFiles) * 100;
@@ -335,22 +312,42 @@
                 const cellValue = row.insertCell(1);
                 cellField.textContent = fieldInfo['Field'];
                 
+                // Use provided value, or fetch dummy data if 'NA'
                 let value = fieldInfo['Value'] !== 'NA' ? fieldInfo['Value'] : getRandomData(fieldInfo['Field']);
-                if (fieldInfo['Field'] === 'Patient Birth Date') {
-                    value = formatBirthDate(value);
-                }
-                
                 cellValue.textContent = value;
             });
          }
+
+         function getRandomData(field) {
+            // Define your dummy data for each field or return a general placeholder
+            const dummyData = {
+                'Patient Name': 'John Doe',
+                'Patient Birth Date': '1980-01-01',
+                'Body Part Examined': 'Head',
+                'Study Time': '14:30:00',
+                'Accession Number': '123456789',
+                'Modality': 'CT',
+                'Result': 'N/A',
+                'Study Description': 'Routine checkup',
+                // Add more fields as necessary
+            };
+
+            return dummyData[field] || 'Not Available'; // Return specific dummy data or a general placeholder
+        }
  
-            function fetchAndDisplayMetadata(filename) {
-                $.getJSON(`/dicom-metadata/${filename}`, function(metadata) {
-                    populateMetadataTable(metadata);
-                }).fail(function() {
-                    console.error("Failed to load DICOM metadata");
-                });
-            }
+        function fetchAndDisplayMetadata(fullPath) {
+            // Building the URL by including the subfolder path
+            const url = `/dicom-metadata/${fullPath}`;
+            console.log(`Fetching metadata from: ${url}`); // Debugging log
+           
+            $.getJSON(url, function(metadata) {
+                console.log('Metadata received:', metadata); // Debugging log
+                populateMetadataTable(metadata);
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                console.error("Failed to load DICOM metadata:", textStatus, errorThrown);
+            });
+        }
+
  
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
