@@ -184,6 +184,10 @@
             document.getElementById('file-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
         }
 
+        function updateSegmentationName(input) {
+            document.getElementById('segmentation-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
+        }
+
 
         function applyWindowing() {
                 const element = document.getElementById('dicomViewer');
