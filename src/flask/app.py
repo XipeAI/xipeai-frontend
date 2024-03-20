@@ -78,6 +78,14 @@ def remove_spaces_from_folders(root_dir):
                     print(f"Directory cannot be renamed because {new_dir_path} already exists")
 
 
+def clear_directory(directory):
+    for root, dirs, files in os.walk(directory, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            os.rmdir(os.path.join(root, name))
+
+        
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if not request.files:
@@ -87,7 +95,7 @@ def upload_file():
 
     if file and file.filename and file.filename.endswith('.zip'):
         # Your existing code for clearing the EXTRACTED_FOLDER goes here
-
+        clear_directory(app.config['EXTRACTED_FOLDER'])
         zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(zip_path)
 
@@ -126,7 +134,7 @@ def upload_segmentation_file():
                 os.remove(os.path.join(root, name))
             for name in dirs:
                 os.rmdir(os.path.join(root, name))
-
+        clear_directory(app.config['SEGMENTED_FOLDER'])
         # Save the ZIP file
         zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(zip_path)

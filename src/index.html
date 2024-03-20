@@ -67,10 +67,8 @@
             padding-top: 3px;
             padding-left: 15px;
             padding-right: 15px;
-            background: #009879;
+
             outline: none;
-            opacity: 0.7;
-            transition: opacity .2s;
         }
         
         input[type='range'] {
@@ -177,25 +175,43 @@
             background-color: #007b66; /* Darken color on hover */
         }
 
-        #form-container {
-            display: flex; /* Use flexbox */
-            justify-content: center; /* Center horizontally */
-            align-items: center; /* Center vertically */
-            margin-top: 30px;
-            margin-bottom: 30px;
+        .upload-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start; /* Align the tops of the containers */
+            margin-top: 40px; /* Space from the title or any element above */
         }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center; /* Center items horizontally */
+            width: 48%; /* Slightly less than half to fit two sections */
+        
+        }
+
+
+        #dicom-upload-form, 
+        #segmentation-upload-form,
+        #dicom-subfolder-select,
+        #segmentation-subfolder-select {
+            margin-bottom: 10px; /* Add some margin between the elements */
+        }
+
 
         #subfolder-container {
             margin: 10px 0;
             margin-top: 10px;
             display: flex;
+            margin-bottom: 30px;
+
             color: #009879;
             justify-content: center; /* Center the dropdown and button */
             align-items: baseline;
             font-weight: 600;
             font-size:large;
             font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
-            
+
         }
 
         #subfolder-select, #analyse-btn {
@@ -226,6 +242,66 @@
         #analyse-btn:hover {
             background-color: #006050; /* Darker shade on hover for the button */
         }
+
+        @media (max-width: 768px) {
+            .upload-container {
+                flex-direction: column;
+            }
+
+            .upload-section {
+                width: auto; /* Full width on smaller screens */
+            }
+        }
+
+        /*Segmantation section*/
+
+        #segmentation-subfolder-container {
+            margin: 10px 0;
+            margin-top: 10px;
+            display: flex;
+            color: #009879;
+            justify-content: center; /* Center the dropdown and button */
+            align-items: baseline;
+            font-weight: 600;
+            font-size:large;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+        }
+
+        #segmentation-subfolder-select, #analyse-segmentation-btn {
+            padding: 10px;
+            margin-left: 20px;
+            margin-top: 10px;
+            margin-right: 0px; /* Add some space between the select and button */
+            border: 2px solid #009879; /* Add a border matching your theme */
+            border-radius: 5px; /* Rounded corners */
+            background-color: #fff; /* White background for the dropdown */
+            color: #009879; /* Text color to match the theme */
+            font-size: 16px; /* Slightly larger font size for better readability */
+            cursor: pointer; /* Change cursor to indicate clickable items */
+        }
+
+        #segmentation-subfolder-select:focus, #analyse-segmentation-btn:focus {
+            outline: none; /* Remove default focus outline */
+            box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+        }
+
+        #analyse-segmentation-btn {
+            background-color: #009879; /* Match the primary color theme for the button */
+            color: #ffffff; /* White text for the button */
+            font-weight: bold; /* Make button text bold */
+            transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        }
+
+        #analyse-segmentation-btn:hover {
+            background-color: #006050; /* Darker shade on hover for the button */
+        }
+        
+        #windowing-controls{
+            margin-top: 30px;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+            font-weight: 650;
+            color: #009879;
+        }
     </style>
 </head>
 
@@ -234,42 +310,47 @@
     <h2 class="header-title">XipeAI | DICOM Viewer</h2>
     <hr>
 
-<div id="form-container">
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <label for="file-upload" class="custom-file-upload">Choose File</label>
-        <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
-        <span id="file-name">No file chosen</span>
-        <input type="submit" value="Upload">
-    </form>
+<div class="upload-container">
+    <div class="upload-section">
+        <div id="form-container">
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <label for="file-upload" class="custom-file-upload">Choose File</label>
+                <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
+                <span id="file-name">No file chosen</span>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+
+        <div id="subfolder-container">
+            <label for="subfolder-select">Select Subfolder:</label>
+            <select id="subfolder-select">
+                <!-- Options will be dynamically populated here -->
+            </select>
+            <!-- Analyse button -->
+            <button id="analyse-btn">Analyse</button>
+        </div>
+    </div>
+    <div class="upload-section">
+        <div id="segmentation-form-container">
+            <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
+                <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
+                <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
+                <span id="segmentation-name">No file chosen</span>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+
+        <div id="segmentation-subfolder-container">
+            <label for="segmentation-subfolder-select">Select Segmentation:</label>
+            <select id="segmentation-subfolder-select">
+                <!-- Segmentation subfolders will be dynamically populated here -->
+            </select>
+            <button id="analyse-segmentation-btn">Analyse</button>
+        </div>
+    </div>
 </div>
 
 <hr>
-    
-<div id="subfolder-container">
-    <label for="subfolder-select">Select Subfolder:</label>
-    <select id="subfolder-select">
-        <!-- Options will be dynamically populated here -->
-    </select>
-    <!-- Analyse button -->
-    <button id="analyse-btn">Analyse</button>
-</div>
-
-<div id="form-container"></div>
-    <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
-        <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
-        <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
-        <span id="segmentation-name">No file chosen</span>
-        <input type="submit" value="Upload">
-    </form>
-</div>
-
-<div id="segmentation-subfolder-container">
-    <label for="segmentation-subfolder-select">Select Segmentation Subfolder:</label>
-    <select id="segmentation-subfolder-select">
-        <!-- Segmentation subfolders will be dynamically populated here -->
-    </select>
-    <button id="analyse-segmentation-btn">Analyse Segmentation</button>
-</div>
 
     <!-- Windowing Controls -->
     <div id="windowing-controls">
