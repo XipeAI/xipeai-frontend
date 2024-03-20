@@ -14,8 +14,10 @@ app = Flask(__name__)
 CORS(app, origins=["http://127.0.0.1:5000"])
 UPLOAD_FOLDER = 'uploads'
 EXTRACTED_FOLDER = 'extracted'
+SEGMENTED_FOLDER = 'segmented'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
+app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
 
@@ -41,6 +43,8 @@ def dicom_metadata_dummy():
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Ensure EXTRACTED_FOLDER exists
 os.makedirs(app.config['EXTRACTED_FOLDER'], exist_ok=True)
+# Ensure SEGMENTED_FOLDER exists
+os.makedirs(app.config['SEGMENTED_FOLDER'], exist_ok=True)
  
 # Define the path to your 'src' directory relative to 'app.py'
 src_dir = os.path.abspath('src/')
@@ -74,6 +78,14 @@ def remove_spaces_from_folders(root_dir):
                     print(f"Directory cannot be renamed because {new_dir_path} already exists")
 
 
+def clear_directory(directory):
+    for root, dirs, files in os.walk(directory, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            os.rmdir(os.path.join(root, name))
+
+        
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if not request.files:
@@ -82,31 +94,70 @@ def upload_file():
     file = next(request.files.values(), None)
 
     if file and file.filename and file.filename.endswith('.zip'):
-        # Clear existing content in the EXTRACTED_FOLDER
-        for root, dirs, files in os.walk(app.config['EXTRACTED_FOLDER'], topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-
-        # Save and extract the ZIP file to the EXTRACTED_FOLDER
+        # Your existing code for clearing the EXTRACTED_FOLDER goes here
+        clear_directory(app.config['EXTRACTED_FOLDER'])
         zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(zip_path)
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(app.config['EXTRACTED_FOLDER'])
 
-        # After extracting files:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Extract all files, skipping __MACOSX and any other undesired files/folders
+            for member in zip_ref.infolist():
+                if '__MACOSX' not in member.filename:
+                    # Ensure target directory exists (handles nested directories)
+                    target_path = os.path.join(app.config['EXTRACTED_FOLDER'], member.filename)
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    if not os.path.isdir(target_path):  # Avoid trying to extract directories directly
+                        zip_ref.extract(member, app.config['EXTRACTED_FOLDER'])
+
         remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'])
 
         # Get the list of subfolders
-        subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
-        subfolders = [subfolder for subfolder in subfolders if os.path.dirname(subfolder)]
+        dicom_subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
+        session['dicom_subfolders'] = dicom_subfolders  # Only update the DICOM subfolders
 
-        session['subfolders'] = subfolders
 
         return redirect(url_for('index'))
     else:
         return 'Invalid file format or no file selected'
+    
+@app.route('/uploadsegmented', methods=['POST'])
+def upload_segmentation_file():
+    if not request.files:
+        return 'No file part in the request'
+
+    file = next(request.files.values(), None)
+
+    if file and file.filename and file.filename.endswith('.zip'):
+        # Clear existing content in the EXTRACTED_FOLDER
+        for root, dirs, files in os.walk(app.config['SEGMENTED_FOLDER'], topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        clear_directory(app.config['SEGMENTED_FOLDER'])
+        # Save the ZIP file
+        zip_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(zip_path)
+
+        # Extract the ZIP file while skipping the __MACOSX directory
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(app.config['SEGMENTED_FOLDER'])
+
+        # After extracting files:
+        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
+
+        # Get the list of subfolders
+        segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
+        session['segmentation_subfolders'] = segmentation_subfolders  # Only update the segmentation subfolders
+
+        return redirect(url_for('index'))
+    else:
+        return 'Invalid file format or no file selected'
+
+ 
+# @app.route('/dicom/<path:filename>')
+# def serve_dicom_file(filename):
+#     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
 
 def get_subfolders(directory, root_dir=None):
     if root_dir is None:
@@ -122,11 +173,23 @@ def get_subfolders(directory, root_dir=None):
                 subfolders_list.append(os.path.relpath(item.path, root_dir))
             subfolders_list.extend(subfolder_paths)
     return subfolders_list
+    
+# def get_subfolders(root_dir):
+#     subfolders = []
+#     for dirpath, dirs, files in os.walk(root_dir):
+#         for d in dirs:
+#             subfolders.append(os.path.join(dirpath, d))
+#     return subfolders
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
-    # Return the list of subfolders stored in the session
-    return jsonify(session.get('subfolders', []))
+    # Return the list of DICOM subfolders stored in the session
+    dicom_subfolders = session.get('dicom_subfolders', [])
+    segmentation_subfolders = session.get('segmentation_subfolders', [])
+    return jsonify({
+        'dicom_subfolders': dicom_subfolders,
+        'segmentation_subfolders': segmentation_subfolders
+    })
  
 @app.route('/dicom/<path:filename>')
 def serve_dicom_file(filename):
@@ -135,6 +198,7 @@ def serve_dicom_file(filename):
 
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
     file_path = safe_join(base_dir, filename)
+    print(f"HERERERERERE: {file_path}")
 
     # Log the absolute file path for debugging
     print(f"Full file path: {file_path}")
@@ -144,8 +208,18 @@ def serve_dicom_file(filename):
     
     return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
 
+@app.route('/segmentation/<path:filename>')
+def serve_segmentation_file(filename):
+    # Log the received filename for debugging
+    print(f"Requested file: {filename}")
 
-
+    base_dir = os.path.abspath(app.config['SEGMENTED_FOLDER'])
+    file_path = safe_join(base_dir, filename)
+    
+    if not os.path.exists(file_path):
+        return "File not found", 404
+    
+    return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
 
 @app.route('/list-dicom-files')
 def list_dicom_files():
@@ -173,12 +247,37 @@ def list_dicom_files():
     dicom_files.sort()
     return jsonify(dicom_files)
 
+@app.route('/list-segmentation-files')
+def list_segmentation_files():
+    selected_subfolder = request.args.get('subfolder')
+    print(f"Requested subfolder: {selected_subfolder}")  # For debugging
+
+    if selected_subfolder is None:
+        return jsonify({"error": "No subfolder provided"}), 400
+    
+    # Ensure the subfolder exists
+    subfolder_path = os.path.join(app.config['SEGMENTED_FOLDER'], selected_subfolder)
+    if not os.path.exists(subfolder_path):
+        return jsonify({"error": "Subfolder not found"}), 404
+
+    # List DICOM files
+    dicom_files = []
+    for root, dirs, files in os.walk(subfolder_path):
+        for file in files:
+            if file.lower().endswith('.dcm'):
+                # Generate a relative path to the file from the EXTRACTED_FOLDER
+                relative_path = os.path.relpath(os.path.join(root, file), start=root)
+                dicom_files.append(relative_path)
+
+    # Sort the list of DICOM files alphabetically by their relative paths
+    dicom_files.sort()
+    return jsonify(dicom_files)
  
-@app.after_request
-def after_request(response):
-    print("In after_request")
-    print(response.headers)
-    return response
+# @app.after_request
+# def after_request(response):
+#     print("In after_request")
+#     print(response.headers)
+#     return response
  
 @app.route('/dicom-metadata/<path:filepath>')
 def dicom_metadata(filepath):
