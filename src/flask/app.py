@@ -151,27 +151,27 @@ def upload_segmentation_file():
 # def serve_dicom_file(filename):
 #     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
 
-# def get_subfolders(directory, root_dir=None):
-#     if root_dir is None:
-#         root_dir = directory
+def get_subfolders(directory, root_dir=None):
+    if root_dir is None:
+        root_dir = directory
 
-#     subfolders_list = []
-#     for item in os.scandir(directory):
-#         if item.is_dir():
-#             # Recursive call to get subfolders of subfolders
-#             subfolder_paths = get_subfolders(item.path, root_dir)
-#             # Only add subdirectories that are not the root directory
-#             if item.path != root_dir:
-#                 subfolders_list.append(os.path.relpath(item.path, root_dir))
-#             subfolders_list.extend(subfolder_paths)
-#     return subfolders_list
+    subfolders_list = []
+    for item in os.scandir(directory):
+        if item.is_dir():
+            # Recursive call to get subfolders of subfolders
+            subfolder_paths = get_subfolders(item.path, root_dir)
+            # Only add subdirectories that are not the root directory
+            if item.path != root_dir:
+                subfolders_list.append(os.path.relpath(item.path, root_dir))
+            subfolders_list.extend(subfolder_paths)
+    return subfolders_list
     
-def get_subfolders(root_dir):
-    subfolders = []
-    for dirpath, dirs, files in os.walk(root_dir):
-        for d in dirs:
-            subfolders.append(os.path.join(dirpath, d))
-    return subfolders
+# def get_subfolders(root_dir):
+#     subfolders = []
+#     for dirpath, dirs, files in os.walk(root_dir):
+#         for d in dirs:
+#             subfolders.append(os.path.join(dirpath, d))
+#     return subfolders
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
@@ -252,17 +252,18 @@ def list_segmentation_files():
     if not os.path.exists(subfolder_path):
         return jsonify({"error": "Subfolder not found"}), 404
 
-    
-    segmentation_files = []
-    for root, dirs, files in os.walk(app.config['SEGMENTED_FOLDER']):
+    # List DICOM files
+    dicom_files = []
+    for root, dirs, files in os.walk(subfolder_path):
         for file in files:
-            # Assuming segmentation files also have .dcm extension or adjust accordingly
-            if file.lower().endswith('.dcm'): 
-                relative_path = os.path.relpath(os.path.join(root, file), start=app.config['SEGMENTED_FOLDER'])
-                segmentation_files.append(relative_path)
+            if file.lower().endswith('.dcm'):
+                # Generate a relative path to the file from the EXTRACTED_FOLDER
+                relative_path = os.path.relpath(os.path.join(root, file), start=root)
+                dicom_files.append(relative_path)
 
-    segmentation_files.sort()
-    return jsonify(segmentation_files)
+    # Sort the list of DICOM files alphabetically by their relative paths
+    dicom_files.sort()
+    return jsonify(dicom_files)
  
 # @app.after_request
 # def after_request(response):

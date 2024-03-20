@@ -393,8 +393,9 @@
 
                 cornerstone.loadImage(imageId).then(function(image) {
                     cornerstone.displayImage(element, image);
-                    applyWindowing(); // Make sure this function is properly defined and applies windowing as expected
-                    loadAndOverlaySegmentation(imageIndex);
+                    applyWindowing()
+                    console.log(segmentationFiles)
+                    loadAndOverlaySegmentation(imageIndex)
                     fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
