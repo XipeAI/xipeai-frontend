@@ -24,9 +24,13 @@
             background-color: #f4f4f4;
             color: #333;
         }
-     
-        /* Center the title */
-        h2 {
+
+        /* Add styles for the header-title class */
+        .header-title {
+            background-color: #009879; /* Replace with the color you want */
+            color: #ffffff; /* Optional: Change the text color if needed */
+            padding: 30px; /* Optional: Add some padding */
+            margin-top: 0;
             text-align: center;
         }
      
@@ -37,31 +41,57 @@
             align-items: flex-start;
             justify-content: space-between; /* Distributes space between and around content items */
         
-            margin-top: 20px; /* Space for the title */
+            margin-top: 50px; /* Space for the title */
         }
      
         /* DICOM Viewer styles */
         #dicomViewer {
             flex: 1; /* Allocate half of the available space */
             width: 50%; /* Adjust width if necessary */
-            height: 350px; /* New height for the DICOM viewer */
+            height: 500px; /* New height for the DICOM viewer */
             display: flex; /* Use flexbox for centering the content */
             justify-content: center; /* Center horizontally in the flex container */
             align-items: center; /* Center vertically in the flex container */
-            border: 1px solid #ddd; /* A light grey border */
+            border: 5px solid #009879; /* A light grey border */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* A subtle shadow for depth */
-            padding: 10px; /* Space inside the viewer */
+            padding: 10px;
+            background-color: #000000;
         }
+
 
          /* Slider styles */
          #slider-container {
-            width: 100%;
-            margin-top: 20px;
+            width: 50%;
+            border-radius: 5px;
+            margin-top: 15px;
+            padding-top: 3px;
+            padding-left: 15px;
+            padding-right: 15px;
+
+            outline: none;
         }
         
         input[type='range'] {
             width: 100%;
             cursor: pointer;
+        }
+
+        .rs-label {          
+            position: relative;
+            transform-origin: center center;
+            display: block;
+            width: 60px;
+            height: 60px;
+            line-height: 30px;
+            text-align: center;
+            font-weight: bold;
+            padding-top: 7px;
+            font-weight: bold;
+            box-sizing: border-box;
+            color:#009879;
+            font-style: normal;
+            line-height: normal;
+            font-size: 15px;
         }
      
      
@@ -104,22 +134,27 @@
                 width: 100%; /* Full width on smaller screens */
                 margin-left: 0; /* Remove the margin on smaller screens */
             }  
-           
         }
      
         /* Style for file input */
         input[type="file"] {
                 display: none; /* Hide the default file input */
+                
         }
        
         .custom-file-upload {
                 border: 1px solid #ccc;
                 display: inline-block;
                 padding: 6px 12px;
+                font-size: medium;
                 cursor: pointer;
+                margin-right: 15px;
                 background-color: #009879; /* Change background color */
                 color: #fff; /* Change text color */
                 border-radius: 4px; /* Add rounded corners */
+                transition: background-color 0.3s ease; 
+                font-weight: bold;
+                
         }
      
         /* Style for upload button */
@@ -130,22 +165,200 @@
                 padding: 10px 20px; /* Adjust padding */
                 border-radius: 4px; /* Add rounded corners */
                 cursor: pointer;
-            }
+                font-size: medium;
+                margin-left: 15px;
+                transition: background-color 0.3s ease;
+                font-weight: bold;
+        }
      
         input[type="submit"]:hover {
-                background-color: #007b66; /* Darken color on hover */
+            background-color: #007b66; /* Darken color on hover */
         }
 
+        .upload-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start; /* Align the tops of the containers */
+            margin-top: 40px; /* Space from the title or any element above */
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center; /* Center items horizontally */
+            width: 48%; /* Slightly less than half to fit two sections */
+        
+        }
+
+
+        #dicom-upload-form, 
+        #segmentation-upload-form,
+        #dicom-subfolder-select,
+        #segmentation-subfolder-select {
+            margin-bottom: 10px; /* Add some margin between the elements */
+        }
+
+
+        #subfolder-container {
+            margin: 10px 0;
+            margin-top: 10px;
+            display: flex;
+            margin-bottom: 30px;
+
+            color: #009879;
+            justify-content: center; /* Center the dropdown and button */
+            align-items: baseline;
+            font-weight: 600;
+            font-size:large;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+
+        }
+
+        #subfolder-select, #analyse-btn {
+            padding: 10px;
+            margin-left: 20px;
+            margin-top: 10px;
+            margin-right: 0px; /* Add some space between the select and button */
+            border: 2px solid #009879; /* Add a border matching your theme */
+            border-radius: 5px; /* Rounded corners */
+            background-color: #fff; /* White background for the dropdown */
+            color: #009879; /* Text color to match the theme */
+            font-size: 16px; /* Slightly larger font size for better readability */
+            cursor: pointer; /* Change cursor to indicate clickable items */
+        }
+
+        #subfolder-select:focus, #analyse-btn:focus {
+            outline: none; /* Remove default focus outline */
+            box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+        }
+
+        #analyse-btn {
+            background-color: #009879; /* Match the primary color theme for the button */
+            color: #ffffff; /* White text for the button */
+            font-weight: bold; /* Make button text bold */
+            transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        }
+
+        #analyse-btn:hover {
+            background-color: #006050; /* Darker shade on hover for the button */
+        }
+
+        @media (max-width: 768px) {
+            .upload-container {
+                flex-direction: column;
+            }
+
+            .upload-section {
+                width: auto; /* Full width on smaller screens */
+            }
+        }
+
+        /*Segmantation section*/
+
+        #segmentation-subfolder-container {
+            margin: 10px 0;
+            margin-top: 10px;
+            display: flex;
+            color: #009879;
+            justify-content: center; /* Center the dropdown and button */
+            align-items: baseline;
+            font-weight: 600;
+            font-size:large;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+        }
+
+        #segmentation-subfolder-select, #analyse-segmentation-btn {
+            padding: 10px;
+            margin-left: 20px;
+            margin-top: 10px;
+            margin-right: 0px; /* Add some space between the select and button */
+            border: 2px solid #009879; /* Add a border matching your theme */
+            border-radius: 5px; /* Rounded corners */
+            background-color: #fff; /* White background for the dropdown */
+            color: #009879; /* Text color to match the theme */
+            font-size: 16px; /* Slightly larger font size for better readability */
+            cursor: pointer; /* Change cursor to indicate clickable items */
+        }
+
+        #segmentation-subfolder-select:focus, #analyse-segmentation-btn:focus {
+            outline: none; /* Remove default focus outline */
+            box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+        }
+
+        #analyse-segmentation-btn {
+            background-color: #009879; /* Match the primary color theme for the button */
+            color: #ffffff; /* White text for the button */
+            font-weight: bold; /* Make button text bold */
+            transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        }
+
+        #analyse-segmentation-btn:hover {
+            background-color: #006050; /* Darker shade on hover for the button */
+        }
+        
+        #windowing-controls{
+            margin-top: 30px;
+            font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+            font-weight: 650;
+            color: #009879;
+        }
     </style>
 </head>
+
+
 <body>
-    <h2>XipeAI | DICOM Viewer</h2>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <label for="file-upload" class="custom-file-upload">Choose File</label>
-        <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
-        <span id="file-name">No file chosen</span>
-        <input type="submit" value="Upload">
-    </form>
+    <h2 class="header-title">XipeAI | DICOM Viewer</h2>
+    <hr>
+
+<div class="upload-container">
+    <div class="upload-section">
+        <div id="form-container">
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <label for="file-upload" class="custom-file-upload">Choose File</label>
+                <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
+                <span id="file-name">No file chosen</span>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+
+        <div id="subfolder-container">
+            <label for="subfolder-select">Select Subfolder:</label>
+            <select id="subfolder-select">
+                <!-- Options will be dynamically populated here -->
+            </select>
+            <!-- Analyse button -->
+            <button id="analyse-btn">Analyse</button>
+        </div>
+    </div>
+    <div class="upload-section">
+        <div id="segmentation-form-container">
+            <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
+                <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
+                <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
+                <span id="segmentation-name">No file chosen</span>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+
+        <div id="segmentation-subfolder-container">
+            <label for="segmentation-subfolder-select">Select Segmentation:</label>
+            <select id="segmentation-subfolder-select">
+                <!-- Segmentation subfolders will be dynamically populated here -->
+            </select>
+            <button id="analyse-segmentation-btn">Analyse</button>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+    <!-- Windowing Controls -->
+    <div id="windowing-controls">
+        <label for="window-width">Window Width:</label>
+        <input type="range" id="window-width" min="1" max="4000" value="150" onchange="applyWindowing()">
+        <label for="window-level">Window Level:</label>
+        <input type="range" id="window-level" min="-1024" max="3071" value="60" onchange="applyWindowing()">
+    </div>
 
     <div id="layout">
         <!-- DICOM Viewer -->
@@ -160,67 +373,193 @@
 
     <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
     <div id="slider-container">
-        <input type="range" id="dicom-slider" min="0" value="0">
+        <input type="range" min="1" max="100" value="50" class="slider" id="dicom-slider">
     </div>
- 
+    <span id="rs-bullet" class="rs-label">0 / 0</span>
+
     <script>
-        let currentIndex = 0;
-        let dicomFiles = [];
 
         function updateFileName(input) {
             document.getElementById('file-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
         }
 
+        function updateSegmentationName(input) {
+            document.getElementById('segmentation-name').textContent = input.files.length > 0 ? input.files[0].name : 'No file chosen';
+        }
+
+        function applyWindowing() {
+                const element = document.getElementById('dicomViewer');
+                const viewport = cornerstone.getViewport(element);
+
+                // Retrieve the window width and window level from the input sliders
+                const windowWidth = document.getElementById('window-width').value;
+                const windowLevel = document.getElementById('window-level').value;
+
+                // Apply the windowing parameters
+                viewport.voi.windowWidth = parseInt(windowWidth, 10);
+                viewport.voi.windowCenter = parseInt(windowLevel, 10);
+
+                // Update the viewport with the new settings
+                cornerstone.setViewport(element, viewport);
+            }
+
         $(document).ready(function() {
+            let currentIndex = 0;
+            let dicomFiles = [];
             const element = document.getElementById('dicomViewer');
             cornerstone.enable(element);
- 
-        
+            let segmentationFiles = [];
+            let lastSegmentationCanvas = null;
 
-        function loadDicomImage(imageIndex) {
-            const imageId = `wadouri:http://127.0.0.1:5000/dicom/${dicomFiles[imageIndex]}`;
-            cornerstone.loadImage(imageId).then(function(image) {
-                cornerstone.displayImage(element, image);
-                // Populate the metadata table for the current image
-                fetchAndDisplayMetadata(dicomFiles[currentIndex]);
-
-                const slider = document.getElementById('dicom-slider');
-                slider.max = dicomFiles.length - 1;
-                slider.value = imageIndex;
+            // Listen for image rendered events to redraw the last segmentation
+            $(element).on('cornerstoneimagerendered', function() {
+                if (lastSegmentationCanvas) {
+                    overlaySegmentationOnDicomViewer(element, lastSegmentationCanvas);
+                }
             });
-}
-
  
-        function populateMetadataTable(metadata) {
-            const table = document.getElementById('dicom-metadata-table');
-            // Clear existing table rows, except for the header
-            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
+            function loadDicomImagesForSubfolder(subfolder) {
+                $.getJSON(`/list-dicom-files?subfolder=${subfolder}`, function(files) {
+                    dicomFiles = files;
+                    if (dicomFiles.length > 0) {
+                        // Use the first file as an example, you can modify this index
+                        const middleIndex = Math.floor(dicomFiles.length / 2);
+                        loadDicomImage(middleIndex); // Load the first DICOM file in the viewer
+                        updateSlider(dicomFiles.length, middleIndex); // Update the slider with the number of files
+                    } else {
+                        console.log("No DICOM files found in the selected subfolder.");
+                        clearViewerAndMetadata();
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error("Failed to load DICOM files list for the selected subfolder:", textStatus, errorThrown);
+                    clearViewerAndMetadata();
+                });
+            }
 
-            // Helper function to generate random data for demonstration purposes
-            function getRandomData(field) {
-                switch(field) {
-                    case 'Patient Name':
-                        return 'John Doe';
-                    case 'Patient Birth Date':
-                        return '1980-01-01'; // Default random birth date
-                    case 'Body Part Examined':
-                        return 'Head';
-                    case 'Study Time':
-                        return '14:30:00';
-                    case 'Accession Number':
-                        return Math.random().toString(36).slice(2, 10);
-                    case 'Modality':
-                        return 'CT';
-                    case 'Study Description':
-                        return 'Routine checkup';
-                    default:
-                        return 'Random Value';
+            function loadSegmentationImagesForSubfolder(subfolder) {
+                $.getJSON(`/list-segmentation-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+                    segmentationFiles = files;
+                    if(segmentationFiles.length === 0) {
+                        console.log("No segmentation files found in the selected subfolder.");
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error("Failed to load segmentation files list for the selected subfolder:", textStatus, errorThrown);
+                });
+            }
+
+            function updateSlider(numFiles, middleIndex) {
+                const slider = document.getElementById('dicom-slider');
+                slider.max = numFiles - 1;
+                slider.value = middleIndex; // Set slider to the middle index
+                showSliderValue(); // Update the slider's displayed value
+            }
+
+
+            function clearViewerAndMetadata() {
+                // Clear the DICOM viewer and metadata table
+                document.getElementById('dicomViewer').textContent = ''; // Or clear the viewer in the way appropriate for your DICOM library
+                const table = document.getElementById('dicom-metadata-table');
+                table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset the table to just the headers
+                var rangeBullet = document.getElementById("rs-bullet");
+                rangeBullet.innerHTML = '0 / 0'; // Reset the range label
+            }
+
+            function loadDicomImage(imageIndex) {
+                if (dicomFiles.length === 0) return;
+
+                imageIndex = Math.max(0, Math.min(imageIndex, dicomFiles.length - 1));
+                const subfolder = $('#subfolder-select').val(); 
+                const filename = dicomFiles[imageIndex];
+                const imageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${filename}`;
+
+                cornerstone.loadImage(imageId).then(function(image) {
+                    cornerstone.displayImage(element, image);
+                    applyWindowing()
+                    console.log(segmentationFiles)
+                    loadAndOverlaySegmentation(imageIndex)
+                    fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
+                }).catch(function(error) {
+                    console.error('Error loading DICOM image:', error);
+                });
+
+                currentIndex = imageIndex; // Update the current index
+                showSliderValue(); // Call to update the slider's display
+            }
+
+            function loadAndOverlaySegmentation(imageIndex) {
+                if (segmentationFiles.length > imageIndex) {
+                    const subfolder = $('#segmentation-subfolder-select').val(); 
+                    const filename = segmentationFiles[imageIndex];
+                    console.log(segmentationFiles)
+                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+                    cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                        const pixelData = segmentationImage.getPixelData();
+                        
+                        const canvas = document.createElement('canvas');
+                        canvas.width = segmentationImage.width;
+                        canvas.height = segmentationImage.height;
+                        const context = canvas.getContext('2d');
+                        
+                        const imageData = context.createImageData(canvas.width, canvas.height);
+                        const data = imageData.data;
+
+                        for (let i = 0; i < pixelData.length; i++) {
+                            const index = i * 4; 
+                            if (pixelData[i] === 1) { // Liver, for example
+                                data[index] = 0;
+                                data[index + 1] = 255;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            } else if (pixelData[i] === 2) { // Tumor, for example
+                                data[index] = 255;
+                                data[index + 1] = 0;
+                                data[index + 2] = 0;
+                                data[index + 3] = 128; // Semi-transparent
+                            }
+                        }
+
+                        context.putImageData(imageData, 0, 0);
+                        lastSegmentationCanvas = canvas;
+                        overlaySegmentationOnDicomViewer(element, canvas);
+                    }).catch(function(error) {
+                        console.error('Error loading segmentation image:', error);
+                    });
                 }
             }
-            function updateProgressBar(currentIndex, totalFiles) {
-            const progressPercentage = (currentIndex / totalFiles) * 100;
-            document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
-        }
+
+            // function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+            //     const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+            //     if (!cornerstoneCanvas) {
+            //         console.error('DICOM Viewer canvas not found.');
+            //         return;
+            //     }
+
+            //     const ctx = cornerstoneCanvas.getContext('2d');
+            //     ctx.drawImage(segmentationCanvas, 0, 0);
+            //     cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
+            // }
+
+            function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
+                // This ensures we're drawing on top of the loaded DICOM image
+                const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+                if (cornerstoneCanvas) {
+                    const ctx = cornerstoneCanvas.getContext('2d');
+                    ctx.drawImage(segmentationCanvas, 0, 0);
+                    cornerstone.updateImage(dicomViewerElement);
+                } else {
+                    console.error('DICOM Viewer canvas not found.');
+                }
+            }
+ 
+            function populateMetadataTable(metadata) {
+            const table = document.getElementById('dicom-metadata-table');
+            table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
+
+
+                function updateProgressBar(currentIndex, totalFiles) {
+                const progressPercentage = (currentIndex / totalFiles) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
+            }
 
             
             function formatBirthDate(dateString) {
@@ -237,74 +576,245 @@
                 const cellValue = row.insertCell(1);
                 cellField.textContent = fieldInfo['Field'];
                 
+                // Use provided value, or fetch dummy data if 'NA'
                 let value = fieldInfo['Value'] !== 'NA' ? fieldInfo['Value'] : getRandomData(fieldInfo['Field']);
-                if (fieldInfo['Field'] === 'Patient Birth Date') {
-                    value = formatBirthDate(value);
-                }
-                
                 cellValue.textContent = value;
             });
-        }
+            }
 
+            function getRandomData(field) {
+                // Define your dummy data for each field or return a general placeholder
+                const dummyData = {
+                    'Patient Name': 'John Doe',
+                    'Patient Birth Date': '1980-01-01',
+                    'Body Part Examined': 'Head',
+                    'Study Time': '14:30:00',
+                    'Accession Number': '123456789',
+                    'Modality': 'CT',
+                    'Result': 'N/A',
+                    'Study Description': 'Routine checkup',
+                    // Add more fields as necessary
+                };
 
+                return dummyData[field] || 'Not Available'; // Return specific dummy data or a general placeholder
+            }
  
-            function fetchAndDisplayMetadata(filename) {
-                $.getJSON(`/dicom-metadata/${filename}`, function(metadata) {
+            function fetchAndDisplayMetadata(fullPath) {
+                // Building the URL by including the subfolder path
+                const url = `/dicom-metadata/${fullPath}`;
+                console.log(`Fetching metadata from: ${url}`); // Debugging log
+            
+                $.getJSON(url, function(metadata) {
+                    console.log('Metadata received:', metadata); // Debugging log
                     populateMetadataTable(metadata);
-                }).fail(function() {
-                    console.error("Failed to load DICOM metadata");
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error("Failed to load DICOM metadata:", textStatus, errorThrown);
                 });
             }
+
  
             // Fetch the list of DICOM files
             $.getJSON('/list-dicom-files', function(files) {
                 dicomFiles = files;
-                
-                // Check if there are any DICOM files returned
                 if (dicomFiles.length > 0) {
-                    // Load the first image initially
-                    loadDicomImage(0);
+                    // Calculate the initial index to start at the middle of the DICOM files list
+                    const initialIndex = Math.floor(dicomFiles.length / 2);
+
+                    const slider = document.getElementById('dicom-slider');
+                    slider.max = dicomFiles.length - 1;
+                    slider.value = initialIndex; // Set slider position to the middle
+
+                    // Load the DICOM image at the initial index (middle of the list)
+                    loadDicomImage(initialIndex);
+
+                    // Set the initial value display
+                    showSliderValue(); // <-- This is the new position of the call
+
+                    slider.addEventListener('input', function() {
+                        loadDicomImage(parseInt(this.value, 10));
+                        showSliderValue(); 
+                    });
+                }   else {
+                    // Handle the case where there are no DICOM files
+                    rangeBullet.innerHTML = '0 / 0';
                 }
+            });
 
-                // Get the slider element from the DOM
+            // Fetch the list of segmentation files
+            $.getJSON('/list-segmentation-files', function(files) {
+                segmentationFiles = files;
+                // if (segmentationFiles.length > 0) {
+                //     loadSegmentationImage(0); // Load the first segmentation image
+                    
+                // }
+            });
+
+            // Slider event listener
+            const slider = document.getElementById('dicom-slider');
+            // Slider event listener
+            slider.addEventListener('input', function(e) {
+                const index = parseInt(e.target.value, 10);
+                currentIndex = index;
+                loadDicomImage(index);
+                updateProgressBar(currentIndex, dicomFiles.length); // Updated to call with the correct parameters
+                // Calculate the initial index to start at the middle of the DICOM files list
+                const initialIndex = Math.floor(dicomFiles.length / 2);
+
                 const slider = document.getElementById('dicom-slider');
-                
-                // Initialize the slider's maximum range based on the number of DICOM files
                 slider.max = dicomFiles.length - 1;
-                
-                // Set the slider's current value to 0 (first image)
-                slider.value = 0;
+                slider.value = initialIndex; // Set slider position to the middle
 
-                // Attach an event listener to the slider to load the image when the slider value changes
-                slider.addEventListener('input', function(e) {
-                    // Parse the new index from the slider value
-                    const index = parseInt(e.target.value, 10);
-                    
-                    // Update the current index to the new value
-                    currentIndex = index;
-                    
-                    // Load the DICOM image at the new index
-                    loadDicomImage(index);
-                });
+                // Load the DICOM image at the initial index (middle of the list)
+                loadDicomImage(initialIndex);
+
+                // Set the initial value display
+                showSliderValue(); // <-- This is the new position of the call
+
+                // slider.addEventListener('input', function() {
+                //     loadDicomImage(parseInt(this.value, 10));
+                //     showSliderValue(); 
+                // });
+                // }   else {
+                //     // Handle the case where there are no DICOM files
+                //     rangeBullet.innerHTML = '0 / 0';
+                // }
             });
+
  
-            // Implement scrolling to navigate through DICOM files
+            // // Adjusted scrolling event listener
+            // $(dicomViewerElement).on('mousewheel DOMMouseScroll', function(e) {
+            //     e.preventDefault();
+            //     const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
+            //     currentIndex = Math.max(0, Math.min(currentIndex + (delta > 0 ? -1 : 1), dicomFiles.length - 1));
+            //     loadDicomImage(currentIndex);
+            //     updateProgressBar(currentIndex, dicomFiles.length); // Ensure the progress bar is updated on scroll
+            // });
+
+            function updateProgressBar(currentIndex, totalFiles) {
+                // Adjusted to account for zero-based indexing; ensures the first image shows some progress and the last image fills the bar
+                const progressPercentage = ((currentIndex + 1) / totalFiles) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
+            }
+            
+
             $(element).on('mousewheel DOMMouseScroll', function(e) {
-                e.preventDefault();
-                const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
-                currentIndex += delta > 0 ? -1 : 1;
-                if (currentIndex < 0) currentIndex = 0;
-                if (currentIndex >= dicomFiles.length) currentIndex = dicomFiles.length - 1;
-                loadDicomImage(currentIndex);
+                e.preventDefault(); // Prevent the default scroll behavior
+
+                const direction = e.originalEvent.wheelDelta || -e.originalEvent.detail;
+                let newIndex = currentIndex + (direction > 0 ? -1 : 1); // Calculate new index based on scroll direction
+
+                // Ensure newIndex stays within the bounds of available DICOM files
+                newIndex = Math.max(0, Math.min(newIndex, dicomFiles.length - 1));
+
+                if (newIndex !== currentIndex) { // Check if the index has actually changed
+                    loadDicomImage(newIndex); // Load and display the new DICOM image
+
+                    // Synchronize the slider with the current DICOM image being displayed
+                    const slider = document.getElementById('dicom-slider');
+                    slider.value = newIndex; // Update the slider's position
+
+                    currentIndex = newIndex; // Update the global currentIndex to the new value
+                    showSliderValue(); // Optionally, update any display elements showing the current slider value
+                }
             });
 
-            function updateProgressBar() {
-                const progressBar = document.getElementById('progress-bar');
-                const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
-                progressBar.style.width = percentage + '%';
+
+            // function updateProgressBar() {
+            //     const progressBar = document.getElementById('progress-bar');
+            //     const percentage = (currentIndex / (dicomFiles.length - 1)) * 100;
+            //     progressBar.style.width = percentage + '%';
+            // }
+
+            var rangeSlider = document.getElementById("dicom-slider");
+            var rangeBullet = document.getElementById("rs-bullet");
+
+            function initializeSlider() {
+                rangeSlider.max = dicomFiles.length - 1;
+                rangeSlider.value = Math.floor(dicomFiles.length / 2); // Setting slider to start from the middle
+                showSliderValue(); // Update display to reflect the starting position
+                loadDicomImage(parseInt(rangeSlider.value, 10)); // Load the image corresponding to the middle position
             }
 
+            function showSliderValue() {
+                var value = parseInt(rangeSlider.value); // Get the current value of the slider
+                var max = parseInt(rangeSlider.max); // Get the maximum value of the slider
+
+                // Update the bullet with the current value and the total number of DICOM files
+                rangeBullet.innerHTML = (value) + '/' + dicomFiles.length; // Display starts from 1
+
+                // Calculate the bullet's position as a percentage
+                var percent = ((value - rangeSlider.min) / (max - rangeSlider.min));
+
+                // Thumb width adjustment logic
+                var thumbWidth = -11; // Adjust as needed to match your slider's thumb width
+
+                // Calculate the new position for the bullet, including the thumbWidth adjustment
+                var bulletPosition = (percent * (rangeSlider.offsetWidth + thumbWidth)) + (thumbWidth / 2);
+
+                // Update the position of the bullet relative to the slider
+                rangeBullet.style.left = `calc(${bulletPosition}px + (${thumbWidth / 2}px))`; // Adjusted to include thumbWidth in calculation
+            }
+            
+
+            // Add the event listener to update the value display on input
+            rangeSlider.addEventListener('input', function() {
+                const newIndex = parseInt(this.value, 10);
+                loadDicomImage(newIndex);
+                showSliderValue();
+            });
+
+            $('#dicom-slider').on('input', function() {
+                loadDicomImage(parseInt(this.value, 10));
+            });
+
+            $('#subfolder-select').change(function() {
+                const selectedSubfolder = $(this).val();
+                loadDicomImagesForSubfolder(selectedSubfolder); // Trigger loading DICOM files for the selected subfolder
+            });
+
+            $.getJSON('/subfolders', function(data) {
+                const dicomSubfolderSelect = document.getElementById('subfolder-select');
+                data.dicom_subfolders.forEach(function(subfolder) {
+                    const option = document.createElement('option');
+                    option.value = subfolder;
+                    option.textContent = subfolder;
+                    dicomSubfolderSelect.appendChild(option);
+                });
+
+                const segmentationSubfolderSelect = document.getElementById('segmentation-subfolder-select');
+                data.segmentation_subfolders.forEach(function(subfolder) {
+                    const option = document.createElement('option');
+                    option.value = subfolder;
+                    option.textContent = subfolder;
+                    segmentationSubfolderSelect.appendChild(option);
+                });
+            });
+
+            
+            
+            // Event listener for the Analyse button
+            $('#analyse-dicom-btn').click(function() {
+                var selectedSubfolder = $('#dicom-subfolder-select').val();
+                if (selectedSubfolder) {
+                    loadDicomImagesForSubfolder(selectedSubfolder); // Only load images when the button is clicked
+                } else {
+                    alert("Please select a DICOM subfolder first.");
+                }
+            });
+
+            $('#analyse-segmentation-btn').click(function() {
+                var selectedSubfolder = $('#segmentation-subfolder-select').val();
+                if (selectedSubfolder) {
+                    // Load and display segmentation images or perform necessary analysis
+                    // This function needs to be defined or updated to handle segmentation files
+                    loadSegmentationImagesForSubfolder(selectedSubfolder); 
+                } else {
+                    alert("Please select a segmentation subfolder first.");
+                }
+            });
+
         });
+        
 </script>
 </body>
 </html>
