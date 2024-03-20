@@ -476,7 +476,8 @@
                     cornerstone.displayImage(element, image);
                     applyWindowing()
                     console.log(segmentationFiles)
-                    loadAndOverlaySegmentation(imageIndex)
+                    //loadAndOverlaySegmentation(imageIndex)
+                    loadAndOverlaySegmentationWithBoundingBoxes(imageIndex)
                     fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
@@ -527,17 +528,115 @@
                 }
             }
 
-            // function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
-            //     const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
-            //     if (!cornerstoneCanvas) {
-            //         console.error('DICOM Viewer canvas not found.');
-            //         return;
-            //     }
 
-            //     const ctx = cornerstoneCanvas.getContext('2d');
-            //     ctx.drawImage(segmentationCanvas, 0, 0);
-            //     cornerstone.updateImage(dicomViewerElement); // This triggers the viewer to re-render the image
-            // }
+            function labelConnectedComponents(pixelData, width, height) {
+                let labels = new Array(pixelData.length).fill(0);
+                let nextLabel = 1;
+
+                // Check if pixel at (x, y) is valid and belongs to a tumor (value 2)
+                function isValidAndUnlabeled(x, y) {
+                    if (x < 0 || x >= width || y < 0 || y >= height) return false;
+                    const index = y * width + x;
+                    return pixelData[index] === 2 && labels[index] === 0;
+                }
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        if (!isValidAndUnlabeled(x, y)) continue;
+
+                        // Start a new region
+                        labels[y * width + x] = nextLabel;
+                        const stack = [[x, y]];
+
+                        while (stack.length > 0) {
+                            const [cx, cy] = stack.pop();
+                            // Check all 4 neighbors
+                            [[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]].forEach(([nx, ny]) => {
+                                if (isValidAndUnlabeled(nx, ny)) {
+                                    labels[ny * width + nx] = nextLabel;
+                                    stack.push([nx, ny]);
+                                }
+                            });
+                        }
+
+                        nextLabel++;
+                    }
+                }
+
+                return labels;
+            }
+
+            function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
+                if (segmentationFiles.length > imageIndex) {
+                    const subfolder = $('#segmentation-subfolder-select').val();
+                    const filename = segmentationFiles[imageIndex];
+                    console.log(segmentationFiles);
+                    const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+                    cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                        const pixelData = segmentationImage.getPixelData();
+
+                        const width = segmentationImage.width;
+                        const height = segmentationImage.height;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const context = canvas.getContext('2d');
+
+                        // Use the labelConnectedComponents function to label the tumor areas
+                        const labels = labelConnectedComponents(pixelData, width, height);
+
+                        // Calculate bounding boxes for each label
+                        const boundingBoxes = calculateBoundingBoxes(labels, width, height);
+
+                        // Define margin size (e.g., 5 pixels)
+                        const margin = 5;
+
+                        // Draw bounding boxes
+                        context.strokeStyle = 'red';
+                        context.lineWidth = 2;
+                        boundingBoxes.forEach(box => {
+                            if (box) { // Check if box is defined
+                                context.strokeRect(
+                                    Math.max(box.minX - margin, 0), // Ensure x is not less than 0
+                                    Math.max(box.minY - margin, 0), // Ensure y is not less than 0
+                                    Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)), // Ensure width does not exceed canvas width
+                                    Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin)) // Ensure height does not exceed canvas height
+                                );
+                            }
+                        });
+
+                        lastSegmentationCanvas = canvas;
+                        overlaySegmentationOnDicomViewer(element, canvas);
+                    }).catch(function(error) {
+                        console.error('Error loading segmentation image:', error);
+                    });
+                }
+            }
+
+            function calculateBoundingBoxes(labels, width, height) {
+                let boundingBoxes = [];
+                for (let i = 0; i < labels.length; i++) {
+                    const label = labels[i];
+                    if (label === 0) continue; // Skip background pixels
+
+                    const x = i % width;
+                    const y = Math.floor(i / width);
+
+                    if (!boundingBoxes[label]) {
+                        boundingBoxes[label] = { minX: x, minY: y, maxX: x, maxY: y };
+                    } else {
+                        let box = boundingBoxes[label];
+                        box.minX = Math.min(box.minX, x);
+                        box.minY = Math.min(box.minY, y);
+                        box.maxX = Math.max(box.maxX, x);
+                        box.maxY = Math.max(box.maxY, y);
+                    }
+                }
+                return boundingBoxes;
+            }
+
+
 
             function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
                 // This ensures we're drawing on top of the loaded DICOM image
