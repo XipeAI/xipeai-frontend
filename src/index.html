@@ -302,6 +302,86 @@
             font-weight: 650;
             color: #009879;
         }
+
+        /* #segmentation-controls button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #009879;
+            background-color: #fff;
+            color: #009879;
+            border-radius: 5px;
+            cursor: pointer;
+        } */
+
+        .switch {
+                position: relative;
+                display: inline-block;
+                width: 60px;
+                height: 34px;
+                }
+
+        switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+                }
+                .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+        }
+
+        .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: .4s;
+        transition: .4s;
+        }
+
+        input:checked + .toggle-slider {
+        background-color: #2196F3;
+        }
+
+        input:focus + .toggle-slider {
+        box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .toggle-slider:before {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+        }
+
+        .toggle-slider.round {
+        border-radius: 34px;
+        }
+
+        .toggle-slider.round:before {
+        border-radius: 50%;
+        }
+        #label-colored, #label-bounding-boxes {
+            color: #009879; /* Your preferred text color */
+            font-weight: bold;
+            /* Other styling as needed */
+            }
+
+            /* You might want to adjust the styling of the #segmentation-toggle container too */
+        #segmentation-toggle {
+            display: flex;
+            align-items: center;
+            /* Add any other styles such as padding, etc., here */
+            }
     </style>
 </head>
 
@@ -360,6 +440,15 @@
         <input type="range" id="window-level" min="-1024" max="3071" value="60" onchange="applyWindowing()">
     </div>
 
+    <div id="segmentation-toggle" style="display: flex; align-items: center;">
+        <span id="label-colored" style="margin-right: 8px;">Colored</span>
+        <label class="switch">
+            <input type="checkbox" id="toggle-segmentation">
+            <span class="toggle-slider round"></span>
+        </label>
+        <span id="label-bounding-boxes" style="margin-left: 8px;">Bounding Boxes</span>
+    </div>
+
     <div id="layout">
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
@@ -410,6 +499,45 @@
             cornerstone.enable(element);
             let segmentationFiles = [];
             let lastSegmentationCanvas = null;
+            let showBoundingBox = false;
+            let showColoredSegmentation = false
+
+            // Button click handlers
+            $('#toggle-segmentation').change(function() {
+                if ($(this).is(':checked')) {
+                    // If toggle is on, show bounding box segmentation
+                    showBoundingBox = true;
+                    showColoredSegmentation = false;
+                } else {
+                    // If toggle is off, show colored segmentation
+                    showBoundingBox = false;
+                    showColoredSegmentation = true;
+                }
+                updateSegmentationDisplay(); // Update the display
+            });
+
+                function updateSegmentationDisplay() {
+                    // Clear any previously shown segmentation
+                    clearSegmentationDisplay();
+
+                    if (showBoundingBox) {
+                        loadAndOverlaySegmentationWithBoundingBoxes(currentIndex);
+                    } else if (showColoredSegmentation) {
+                        loadAndOverlaySegmentation(currentIndex);
+                    }
+                    // This logic assumes that 'else if' is used to ensure only one type of segmentation is shown at a time based on the last selected option. 
+                    // Adjust this logic based on how you want these toggles to work together.
+                }
+
+                function clearSegmentationDisplay() {
+                    if (lastSegmentationCanvas) {
+                        // Example: clear the last segmentation canvas if applicable
+                        const ctx = lastSegmentationCanvas.getContext('2d');
+                        ctx.clearRect(0, 0, lastSegmentationCanvas.width, lastSegmentationCanvas.height);
+                        lastSegmentationCanvas = null; // Reset the reference
+                    }
+                    // Additional clearing logic here if needed
+                }
 
             // Listen for image rendered events to redraw the last segmentation
             $(element).on('cornerstoneimagerendered', function() {
@@ -417,6 +545,8 @@
                     overlaySegmentationOnDicomViewer(element, lastSegmentationCanvas);
                 }
             });
+
+
  
             function loadDicomImagesForSubfolder(subfolder) {
                 $.getJSON(`/list-dicom-files?subfolder=${subfolder}`, function(files) {
@@ -476,8 +606,7 @@
                     cornerstone.displayImage(element, image);
                     applyWindowing()
                     console.log(segmentationFiles)
-                    //loadAndOverlaySegmentation(imageIndex)
-                    loadAndOverlaySegmentationWithBoundingBoxes(imageIndex)
+                    updateSegmentationDisplay();
                     fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
                 }).catch(function(error) {
                     console.error('Error loading DICOM image:', error);
