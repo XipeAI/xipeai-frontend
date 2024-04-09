@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
 from flask_cors import CORS
 import zipfile
 import shutil
@@ -52,7 +52,7 @@ src_dir = os.path.abspath('src/')
 @app.route('/')
 def index():
     # Specify the path and file you want to serve
-    return send_from_directory(src_dir, 'index.html')
+    return render_template('index.html')
  
 def remove_spaces_from_folders(root_dir):
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):

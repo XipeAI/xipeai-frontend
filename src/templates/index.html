@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DICOM Viewer</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-core"></script>
+    <script src="https://unpkg.com/cornerstone-math"></script>
+    <script src="https://unpkg.com/cornerstone-tools"></script>
+    <script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
+    <script src="https://unpkg.com/dicom-parser"></script>
+    <script>
+        cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+        cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+
+
+<body>
+    <h2 class="header-title">XipeAI | DICOM Viewer</h2>
+    <hr>
+
+    <div class="upload-container">
+        <div class="upload-section">
+            <div id="form-container">
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <label for="file-upload" class="custom-file-upload">Choose File</label>
+                    <input id="file-upload" type="file" name="file" accept=".zip" onchange="updateFileName(this)">
+                    <span id="file-name">No file chosen</span>
+                    <input type="submit" value="Upload">
+                </form>
+            </div>
+
+            <div id="subfolder-container">
+                <label for="subfolder-select">Select Subfolder:</label>
+                <select id="subfolder-select">
+                    <!-- Options will be dynamically populated here -->
+                </select>
+                <!-- Analyse button -->
+                <button id="analyse-btn">Analyse</button>
+            </div>
+        </div>
+        <div class="upload-section">
+            <div id="segmentation-form-container">
+                <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
+                    <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
+                    <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
+                    <span id="segmentation-name">No file chosen</span>
+                    <input type="submit" value="Upload">
+                </form>
+            </div>
+
+            <div id="segmentation-subfolder-container">
+                <label for="segmentation-subfolder-select">Select Segmentation:</label>
+                <select id="segmentation-subfolder-select">
+                    <!-- Segmentation subfolders will be dynamically populated here -->
+                </select>
+                <button id="analyse-segmentation-btn">Analyse</button>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Windowing Controls -->
+    <div id="windowing-controls">
+        <label for="window-width">Window Width:</label>
+        <input type="range" id="window-width" min="1" max="4000" value="150" onchange="applyWindowing()">
+        <label for="window-level">Window Level:</label>
+        <input type="range" id="window-level" min="-1024" max="3071" value="60" onchange="applyWindowing()">
+    </div>
+
+    <div id="segmentation-toggle" style="display: flex; align-items: center;">
+        <span id="label-colored" style="margin-right: 8px;">Colored</span>
+        <label class="switch">
+            <input type="checkbox" id="toggle-segmentation">
+            <span class="toggle-slider round"></span>
+        </label>
+        <span id="label-bounding-boxes" style="margin-left: 8px;">Bounding Boxes</span>
+    </div>
+
+    <div id="layout">
+        <!-- DICOM Viewer -->
+        <div id="dicomViewer"></div>
+
+        <!-- DICOM Metadata Table -->
+        <table id="dicom-metadata-table">
+            <tr><th>Field</th><th>Value</th></tr>
+            <!-- Metadata rows will be inserted here by JavaScript -->
+        </table>
+    </div>
+
+    <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
+    <div id="slider-container">
+        <input type="range" min="1" max="100" value="50" class="slider" id="dicom-slider">
+    </div>
+    <span id="rs-bullet" class="rs-label">0 / 0</span>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
