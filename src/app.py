@@ -338,5 +338,12 @@ def dicom_metadata(filepath):
 
     return jsonify(ordered_metadata)
 
+
+@app.route('/run-analysis', methods=['POST'])
+def run_analysis():
+    subfolder = request.json.get('subfolder')
+    
+    print(f"SUBUUUUUUUIIIII: {subfolder}")
+    
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1')

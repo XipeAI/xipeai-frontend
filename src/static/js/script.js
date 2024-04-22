@@ -512,6 +512,26 @@ $(document).ready(function() {
         // Update the position of the bullet relative to the slider
         rangeBullet.style.left = `calc(${bulletPosition}px + (${thumbWidth / 2}px))`; // Adjusted to include thumbWidth in calculation
     }
+
+    function checkAndEnableAnalyseButton(subfolder) {
+        if (subfolder) {
+            $.getJSON(`/list-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+                if (files && files.length > 0) {
+                    // DICOM files are present, enable the Analyse button
+                    $('#analyse-btn').prop('disabled', false).css({cursor: 'pointer', opacity: 1});
+                } else {
+                    // No DICOM files found, disable the Analyse button
+                    $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+                }
+            }).fail(function() {
+                // Request failed, disable the Analyse button
+                $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+            });
+        } else {
+            // No subfolder is selected, disable the Analyse button
+            $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+        }
+    }
     
 
     // Add the event listener to update the value display on input
@@ -527,7 +547,8 @@ $(document).ready(function() {
 
     $('#subfolder-select').change(function() {
         const selectedSubfolder = $(this).val();
-        loadDicomImagesForSubfolder(selectedSubfolder); // Trigger loading DICOM files for the selected subfolder
+        loadDicomImagesForSubfolder(selectedSubfolder);// Trigger loading DICOM files for the selected subfolder
+        checkAndEnableAnalyseButton(selectedSubfolder);
     });
 
     $.getJSON('/subfolders', function(data) {
@@ -551,13 +572,24 @@ $(document).ready(function() {
     
     
     // Event listener for the Analyse button
-    $('#analyse-dicom-btn').click(function() {
-        var selectedSubfolder = $('#dicom-subfolder-select').val();
-        if (selectedSubfolder) {
-            loadDicomImagesForSubfolder(selectedSubfolder); // Only load images when the button is clicked
-        } else {
-            alert("Please select a DICOM subfolder first.");
-        }
+    $('#analyse-btn').click(function() {
+        var selectedSubfolder = $('#subfolder-select').val();
+        
+        $.ajax({
+            url: '/run-analysis',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({subfolder: selectedSubfolder}),
+            success: function(response) {
+                console.log('Analysis completed: ', response.message);
+                if (response.output) {
+                    console.log('Analysis Output: ', response.output);
+                }
+            },
+            error: function(xhr) {
+                console.error('Analysis failed: ', xhr.responseJSON.error);
+            }
+        });
     });
 
     $('#analyse-segmentation-btn').click(function() {
