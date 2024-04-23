@@ -1,4 +1,5 @@
 import os
+import subprocess
 from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
 from flask_cors import CORS
 import zipfile
@@ -16,13 +17,17 @@ CORS(app, origins=["http://127.0.0.1:5000"])
 UPLOAD_FOLDER = 'uploads'
 EXTRACTED_FOLDER = 'extracted'
 SEGMENTED_FOLDER = 'segmented'
+SEGMENTED_PP_FOLDER = 'segmented_pp'
 NIFTI_FOLDER = 'nifti_extracted'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
 app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
+app.config['SEGMENTED_PP_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_PP_FOLDER)
+
 app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
+os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 
 
 @app.route('/dicom-metadata/dummy')
@@ -99,9 +104,40 @@ def process_dicom_series(extracted_folder, nifti_output_folder, file_id):
             try:
                 dicom2nifti.convert_directory(root, nifti_subfolder_path)
                 print(f"Converted DICOM series in {root} to NIfTI in {nifti_subfolder_path}")
+
+                # Rename files
+                rename_nifti_files(nifti_subfolder_path)
             except Exception as e:
                 print(f"Error converting DICOM series in {root}: {e}")
                 # Optionally, use `flash(f"Error converting DICOM series in {root}: {e}")` to send feedback to the template
+
+
+def rename_nifti_files(nifti_subfolder_path):
+    for filename in os.listdir(nifti_subfolder_path):
+        if filename.endswith('.nii.gz'):
+
+            last_part = nifti_subfolder_path.split('_')[-1]
+            # Check if the last part is numeric and pad it
+            if last_part.isdigit():
+                # Pad the number to three digits
+                padded_number = last_part.zfill(3)
+            else:
+                padded_number = last_part  # Return None or raise an error if the last part is not numeric
+            # Formulate the new filename
+            new_filename = f"volume_{padded_number}_0000.nii.gz"
+            old_file_path = os.path.join(nifti_subfolder_path, filename)
+            new_file_path = os.path.join(nifti_subfolder_path, new_filename)
+            # Rename the file
+            os.rename(old_file_path, new_file_path)
+            print(f"Renamed {filename} to {new_filename}")
+            break  # Assuming only one NIfTI file is expected per directory
+
+def run_command(command):
+    try:
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return {"success": True, "output": result.stdout}  # Success case
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": e.stderr}  # Error case
 
 
         
@@ -343,7 +379,44 @@ def dicom_metadata(filepath):
 def run_analysis():
     subfolder = request.json.get('subfolder')
     
-    print(f"SUBUUUUUUUIIIII: {subfolder}")
+    # construct input folder
+    input_folder = os.path.abspath(app.config['NIFTI_FOLDER'])
+    input_folder = safe_join(input_folder, subfolder)
+    
+    # construct output folder
+    output_folder = os.path.abspath(app.config['SEGMENTED_FOLDER'])
+    output_folder = safe_join(output_folder, subfolder)
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # construct output_pp folder
+    output_pp_folder = os.path.abspath(app.config['SEGMENTED_PP_FOLDER'])
+    output_pp_folder = safe_join(output_pp_folder, subfolder)
+    os.makedirs(output_pp_folder, exist_ok=True)
+    
+    # Command 1: Predicting with nnUNet
+    predict_command = f'nnUNetv2_predict -d Dataset001_Liver -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
+    prediction_result = run_command(predict_command)
+    
+    if not prediction_result['success']:
+        return jsonify({"success": False, "message": "Prediction failed", "error": prediction_result['error']}), 500
+
+    # Command 2: Applying postprocessing with nnUNet
+    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
+    postprocess_result = run_command(postprocess_command)
+    
+    if not postprocess_result['success']:
+        return jsonify({"success": False, "message": "Postprocessing failed", "error": postprocessing_result['error']}), 500
+
+    
+    return jsonify({
+        "success": True,
+        "message": "Analysis completed successfully",
+        "prediction_output": prediction_result['output'],
+        "postprocessing_output": postprocessing_result['output']
+    })
+    
+    
+    
     
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1')
