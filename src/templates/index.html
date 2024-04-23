@@ -85,11 +85,29 @@
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
 
-        <!-- DICOM Metadata Table -->
-        <table id="dicom-metadata-table">
-            <tr><th>Field</th><th>Value</th></tr>
-            <!-- Metadata rows will be inserted here by JavaScript -->
-        </table>
+        <div id="tables-container"></div>
+            <!-- DICOM Metadata Table -->
+            <table id="dicom-metadata-table">
+                <tr><th>Field</th><th>Value</th></tr>
+                <!-- Metadata rows will be inserted here by JavaScript -->
+            </table>
+
+            <table id="tumor-table">
+                <thead>
+                    <tr>
+                        <th>Lesion #</th>
+                        <th>Width (mm)</th>
+                        <th>Height (mm)</th>
+                        <th>Depth (mm)</th>
+                        <th>Volume (mm³)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                 <!-- Rows will be added dynamically using JavaScript -->
+                </tbody>
+            </table>
+
+        </div>
     </div>
 
     <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
@@ -100,19 +118,6 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
     <div id="slice-info">Slice: <span id="current-slice">N/A</span></div>
-    <table id="tumor-table">
-        <thead>
-            <tr>
-                <th>Lesion #</th>
-                <th>Width (mm)</th>
-                <th>Height (mm)</th>
-                <th>Depth (mm)</th>
-                <th>Volume (mm³)</th>
-            </tr>
-        </thead>
-        <tbody>
-         <!-- Rows will be added dynamically using JavaScript -->
-        </tbody>
-    </table>
+
 </body>
 </html>
