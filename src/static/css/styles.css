@@ -79,30 +79,42 @@ input[type='range'] {
 
 
 /* DICOM Metadata Table styles */
-#dicom-metadata-table {
+#dicom-metadata-table, #tumor-table {
     flex: 1; /* Allocate the other half of the available space */
     border-collapse: collapse;
-    margin-left: 20px; /* You can remove this if you want the table to use the full half space */
+    margin-left: 20px; /* Optional: Adjust based on your layout preferences */
 }
 
-#dicom-metadata-table th, #dicom-metadata-table td {
+
+#slice-info{
+    margin-left: 1160px;
+    font-weight: bold;
+}
+#tumor-table{
+    margin-left: 1160px;
+}
+
+
+#dicom-metadata-table th, #dicom-metadata-table td,
+#tumor-table th, #tumor-table td {
     border: 1px solid #ddd; /* Consistent with the viewer border */
     padding: 10px; /* More space for content */
     text-align: left; /* Align text to the left */
 }
 
-#dicom-metadata-table th{
-        background-color: #009879;
-        color: #ffffff;
-    }
+#dicom-metadata-table th, #tumor-table th {
+    background-color: #009879;
+    color: #ffffff;
+}
 
-#dicom-metadata-table tr:nth-of-type(even) {
-        background-color: #d4d4d4;
-       }
+#dicom-metadata-table tr:nth-of-type(even), #tumor-table tr:nth-of-type(even) {
+    background-color: #d4d4d4;
+}
 
-#dicom-metadata-table tbody tr:last-of-type {
+#dicom-metadata-table tbody tr:last-of-type, #tumor-table tbody tr:last-of-type {
     border-bottom: 2px solid #009879;
-    }
+}
+
 
    
 /* Responsive Design */
@@ -285,6 +297,7 @@ input[type="submit"]:hover {
     font-weight: 650;
     color: #009879;
 }
+
 
 /* #segmentation-controls button {
     padding: 10px;

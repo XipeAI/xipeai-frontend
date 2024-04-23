@@ -19,6 +19,7 @@
 
 <body>
     <h2 class="header-title">XipeAI | DICOM Viewer</h2>
+
     <hr>
 
     <div class="upload-container">
@@ -97,5 +98,21 @@
     </div>
     <span id="rs-bullet" class="rs-label">0 / 0</span>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <div id="slice-info">Slice: <span id="current-slice">N/A</span></div>
+    <table id="tumor-table">
+        <thead>
+            <tr>
+                <th>Lesion #</th>
+                <th>Width (mm)</th>
+                <th>Height (mm)</th>
+                <th>Depth (mm)</th>
+                <th>Volume (mm³)</th>
+            </tr>
+        </thead>
+        <tbody>
+         <!-- Rows will be added dynamically using JavaScript -->
+        </tbody>
+    </table>
 </body>
 </html>

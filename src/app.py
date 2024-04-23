@@ -169,7 +169,7 @@ def upload_segmentation_file():
             zip_ref.extractall(app.config['SEGMENTED_FOLDER'])
 
         # After extracting files:
-        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
+        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'], file.filename)
 
         # Get the list of subfolders
         segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])

@@ -77,7 +77,6 @@ $(document).ready(function() {
     });
 
 
-
     function loadDicomImagesForSubfolder(subfolder) {
         $.getJSON(`/list-dicom-files?subfolder=${subfolder}`, function(files) {
             dicomFiles = files;
@@ -225,53 +224,157 @@ $(document).ready(function() {
         return labels;
     }
 
+    function calculateRealWorldMeasurements(boundingBoxes, pixelSpacing, sliceThickness) {
+        let volumes = [];
+        let dimensions = [];
+    
+        boundingBoxes.forEach(box => {
+            if (box) {
+                // Real-world dimensions
+                let width = (box.maxX - box.minX + 1) * pixelSpacing[0];
+                let height = (box.maxY - box.minY + 1) * pixelSpacing[1];
+                let depth = sliceThickness; // Considering the depth is the slice thickness for single slice
+    
+                dimensions.push({ width, height, depth });
+    
+                // Volume calculation - assuming the bounding box represents a rectangular prism
+                let volume = width * height * depth;
+                volumes.push(volume);
+            }
+        });
+    
+        return { dimensions, volumes };
+    }
+    
+    // Function to retrieve pixel spacing and slice thickness from DICOM metadata
+    function getPixelSpacingAndSliceThickness(segmentationImage) {
+        const pixelSpacingString = segmentationImage.data.string('x00280030'); // Pixel spacing DICOM tag
+        const sliceThicknessString = segmentationImage.data.string('x00180050'); // Slice thickness DICOM tag
+    
+        let pixelSpacing = pixelSpacingString ? pixelSpacingString.split('\\').map(Number) : [1, 1]; // Default to 1 if not specified
+        let sliceThickness = sliceThicknessString ? parseFloat(sliceThicknessString) : 1; // Default to 1 if not specified
+    
+        return { pixelSpacing, sliceThickness };
+    }
+
     function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
+        console.log("loadAndOverlaySegmentationWithBoundingBoxes called with index: ", imageIndex);
+    // ... rest of the function
         if (segmentationFiles.length > imageIndex) {
             const subfolder = $('#segmentation-subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
-            console.log(segmentationFiles);
             const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+    
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+                console.log("Segmentation image loaded: ", segmentationImage);
                 const pixelData = segmentationImage.getPixelData();
-
-                const width = segmentationImage.width;
-                const height = segmentationImage.height;
-
+                console.log("Pixel data: ", pixelData);
+                const { width, height } = segmentationImage;
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
                 const context = canvas.getContext('2d');
-
-                // Use the labelConnectedComponents function to label the tumor areas
+    
                 const labels = labelConnectedComponents(pixelData, width, height);
-
-                // Calculate bounding boxes for each label
+                console.log("Labels: ", labels);
                 const boundingBoxes = calculateBoundingBoxes(labels, width, height);
-
+                console.log("Bounding Boxes: ", boundingBoxes);
+    
+                const { pixelSpacing} = getPixelSpacingAndSliceThickness(segmentationImage);
+                const sliceThickness = 5;
+                console.log("Pixel Spacing: ", pixelSpacing, "Slice Thickness: ", sliceThickness);
+                const { dimensions, volumes } = calculateRealWorldMeasurements(boundingBoxes, pixelSpacing, sliceThickness);
+                //updateTumorTable(dimensions, volumes, currentSliceIndex);
+                console.log('Tumor Dimensions:', dimensions);
+                console.log('Tumor Volumes:', volumes);
+    
                 // Define margin size (e.g., 5 pixels)
                 const margin = 5;
-
+    
                 // Draw bounding boxes
                 context.strokeStyle = 'red';
                 context.lineWidth = 2;
                 boundingBoxes.forEach(box => {
-                    if (box) { // Check if box is defined
+                    if (box) {
                         context.strokeRect(
-                            Math.max(box.minX - margin, 0), // Ensure x is not less than 0
-                            Math.max(box.minY - margin, 0), // Ensure y is not less than 0
-                            Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)), // Ensure width does not exceed canvas width
-                            Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin)) // Ensure height does not exceed canvas height
+                            Math.max(box.minX - margin, 0),
+                            Math.max(box.minY - margin, 0),
+                            Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)),
+                            Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin))
                         );
                     }
                 });
-
+    
                 lastSegmentationCanvas = canvas;
                 overlaySegmentationOnDicomViewer(element, canvas);
+
+                // Delay the table update to ensure canvas updates have completed
+                setTimeout(function() {
+                    updateTumorTable(dimensions, volumes, imageIndex);
+                }, 0); // Timeout with 0 delay allows for the rest of the UI to update
+
+                console.log({
+                    pixelData,
+                    labels,
+                    boundingBoxes,
+                    pixelSpacing,
+                    sliceThickness,
+                    dimensions,
+                    volumes
+                });
             }).catch(function(error) {
                 console.error('Error loading segmentation image:', error);
             });
         }
     }
+
+    // function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
+    //     if (segmentationFiles.length > imageIndex) {
+    //         const subfolder = $('#segmentation-subfolder-select').val();
+    //         const filename = segmentationFiles[imageIndex];
+    //         console.log(segmentationFiles);
+    //         const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+    //         cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
+    //             const pixelData = segmentationImage.getPixelData();
+
+    //             const width = segmentationImage.width;
+    //             const height = segmentationImage.height;
+
+    //             const canvas = document.createElement('canvas');
+    //             canvas.width = width;
+    //             canvas.height = height;
+    //             const context = canvas.getContext('2d');
+
+    //             // Use the labelConnectedComponents function to label the tumor areas
+    //             const labels = labelConnectedComponents(pixelData, width, height);
+
+    //             // Calculate bounding boxes for each label
+    //             const boundingBoxes = calculateBoundingBoxes(labels, width, height);
+
+    //             // Define margin size (e.g., 5 pixels)
+    //             const margin = 5;
+
+    //             // Draw bounding boxes
+    //             context.strokeStyle = 'red';
+    //             context.lineWidth = 2;
+    //             boundingBoxes.forEach(box => {
+    //                 if (box) { // Check if box is defined
+    //                     context.strokeRect(
+    //                         Math.max(box.minX - margin, 0), // Ensure x is not less than 0
+    //                         Math.max(box.minY - margin, 0), // Ensure y is not less than 0
+    //                         Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)), // Ensure width does not exceed canvas width
+    //                         Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin)) // Ensure height does not exceed canvas height
+    //                     );
+    //                 }
+    //             });
+
+    //             lastSegmentationCanvas = canvas;
+    //             overlaySegmentationOnDicomViewer(element, canvas);
+    //         }).catch(function(error) {
+    //             console.error('Error loading segmentation image:', error);
+    //         });
+    //     }
+    // }
 
     function calculateBoundingBoxes(labels, width, height) {
         let boundingBoxes = [];
@@ -295,10 +398,37 @@ $(document).ready(function() {
         return boundingBoxes;
     }
 
+    function updateTumorTable(dimensions, volumes, currentSlice) {
+        // Update the current slice info
+        document.getElementById('current-slice').textContent = currentSlice;
+    
+        // Get the table body
+        var tableBody = document.getElementById('tumor-table').getElementsByTagName('tbody')[0];
+    
+        // Clear previous entries
+        tableBody.innerHTML = '';
+    
+        // Add new rows for each tumor
+        dimensions.forEach(function(dimension, index) {
+            if (index < 10) { // Limit to 10 rows
+                var row = tableBody.insertRow();
+                var cellTumor = row.insertCell(0);
+                var cellWidth = row.insertCell(1);
+                var cellHeight = row.insertCell(2);
+                var cellDepth = row.insertCell(3);
+                var cellVolume = row.insertCell(4);
+    
+                cellTumor.textContent = index + 1;
+                cellWidth.textContent = dimension.width.toFixed(2);
+                cellHeight.textContent = dimension.height.toFixed(2);
+                cellDepth.textContent = dimension.depth.toFixed(2);
+                cellVolume.textContent = volumes[index].toFixed(2);
+            }
+        });
+    }
 
 
     function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
-        // This ensures we're drawing on top of the loaded DICOM image
         const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
         if (cornerstoneCanvas) {
             const ctx = cornerstoneCanvas.getContext('2d');
@@ -308,13 +438,14 @@ $(document).ready(function() {
             console.error('DICOM Viewer canvas not found.');
         }
     }
+    
 
     function populateMetadataTable(metadata) {
-    const table = document.getElementById('dicom-metadata-table');
-    table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
+         const table = document.getElementById('dicom-metadata-table');
+         table.innerHTML = '<tr><th>Field</th><th>Value</th></tr>'; // Reset table
 
 
-        function updateProgressBar(currentIndex, totalFiles) {
+    function updateProgressBar(currentIndex, totalFiles) {
         const progressPercentage = (currentIndex / totalFiles) * 100;
         document.getElementById('progress-bar').style.width = `${progressPercentage}%`;
     }
