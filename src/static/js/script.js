@@ -294,14 +294,26 @@ $(document).ready(function() {
                 // Draw bounding boxes
                 context.strokeStyle = 'red';
                 context.lineWidth = 2;
-                boundingBoxes.forEach(box => {
+                console.log('Volumes array:', volumes);
+                boundingBoxes.forEach((box, index) => {
                     if (box) {
+                        const volumeIndex = index - 1;
+                        const volume = volumes[volumeIndex];
+                        const volumeText = volume !== undefined ? `Volume: ${volume.toFixed(2)} mm³` : 'Volume: N/A';
+                        const lesionLabel = `Lesion ${index + 1}`; // Assuming you want 1-based indexing for display
+                        // const volumeIndex = index - 1;
+                        // const volume = volumes[volumeIndex];
+                        // const volumeText = volume !== undefined ? volume.toFixed(2) + ' mm³' : 'N/A';
+                        // const label = `Lesion ${index} ${volumeText}`;
                         context.strokeRect(
                             Math.max(box.minX - margin, 0),
                             Math.max(box.minY - margin, 0),
                             Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)),
                             Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin))
                         );
+
+                        // Draw the label
+                        drawBoundingBoxWithLabel(context, box, lesionLabel, volumeText);
                     }
                 });
     
@@ -313,15 +325,15 @@ $(document).ready(function() {
                     updateTumorTable(dimensions, volumes, imageIndex);
                 }, 0); // Timeout with 0 delay allows for the rest of the UI to update
 
-                console.log({
-                    pixelData,
-                    labels,
-                    boundingBoxes,
-                    pixelSpacing,
-                    sliceThickness,
-                    dimensions,
-                    volumes
-                });
+                // console.log({
+                //     pixelData,
+                //     labels,
+                //     boundingBoxes,
+                //     pixelSpacing,
+                //     sliceThickness,
+                //     dimensions,
+                //     volumes
+                // });
 
             }).catch(function(error) {
                 console.error('Error loading segmentation image:', error);
@@ -351,37 +363,106 @@ $(document).ready(function() {
         return boundingBoxes;
     }
 
+    function drawBoundingBoxWithLabel(context, box, lesionLabel, volumeText) {
+        // Set styles for the bounding box
+        context.strokeStyle = 'red';
+        context.lineWidth = 2;
+    
+        // Calculate text width and height for background sizing
+        const textWidth = 135;
+        const lineHeight = parseInt(context.font, 14); // Extract the font size from the font property
+        const padding = 5; // Add some padding for the text background
+    
+        // Draw the text background
+        context.fillStyle = 'rgba(255, 255, 255, 0.9)'; // semi-transparent white
+        context.fillRect(
+            box.maxX + 10 - padding / 3, // Start a bit to the left of the text
+            box.minY - padding / 2, // Start a bit above the text
+            textWidth + padding, // Add padding to the text width
+            lineHeight * 2 + padding // Multiply by 2 for two lines of text and add padding
+        );
+    
+        // Set the style for the text
+        context.fillStyle = 'red';
+        context.textBaseline = 'top';
+    
+        // Draw the lesion label
+        context.font = 'bold 14px Arial'; // Make font bold
+        context.fillText(lesionLabel, box.maxX + 10, box.minY);
+    
+        // Draw the volume text below the lesion label
+        context.font = '14px Arial';
+        context.fillText(volumeText, box.maxX + 10, box.minY + lineHeight);
+    }
+    
+    // function drawBoundingBoxWithLabel(context, box, label) {
+    //     // Set styles for the bounding box
+    //     context.fillStyle = 'red';
+    //     context.font = '14px Arial';
+    //     context.textBaseline = 'top';
+            
+    //     const labelX = box.maxX + 10; // 10 pixels to the right of the bounding box
+    //     const labelY = box.minY; 
+
+    //     const metrics = context.measureText(label);
+    //     const textWidth = metrics.width;
+    //     const textHeight = parseInt(context.font, 10); // Extracts font size
+    //     const backgroundMargin = 3;
+    //     const backgroundWidth = textWidth + 2 * backgroundMargin;
+    //     const backgroundHeight = textHeight + 2 * backgroundMargin;
+        
+    //     // Draw label background
+    //     context.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Semi-transparent white
+    //     context.fillRect(box.maxX + 10 - backgroundMargin, box.minY - backgroundMargin, 
+    //                      backgroundWidth, backgroundHeight);
+    
+    //     // Draw the label text on top of the background
+    //     context.fillStyle = 'red';
+    //     context.fillText(label, box.maxX + 10, box.minY);
+        
+    // }
+
     function updateTumorTable(dimensions, volumes) {
         // Get the table body
         var tableBody = document.getElementById('tumor-table').getElementsByTagName('tbody')[0];
-    
+        
         // Clear previous entries
         tableBody.innerHTML = '';
     
-        // Add new rows for each tumor
-        for (let i = 0; i < 8; i++) {
+        // Add rows for each tumor with dimensions data
+        dimensions.forEach((dimension, i) => {
             var row = tableBody.insertRow();
             var cellTumor = row.insertCell(0);
             var cellWidth = row.insertCell(1);
             var cellHeight = row.insertCell(2);
             var cellDepth = row.insertCell(3);
             var cellVolume = row.insertCell(4);
+            
+            cellTumor.textContent = i + 1;
+            cellWidth.textContent = dimension.width.toFixed(2);
+            cellHeight.textContent = dimension.height.toFixed(2);
+            cellDepth.textContent = dimension.depth.toFixed(2);
+            cellVolume.textContent = volumes[i].toFixed(2);
+        });
     
-            if (i < dimensions.length) {
-                cellTumor.textContent = i + 1;
-                cellWidth.textContent = dimensions[i].width.toFixed(2);
-                cellHeight.textContent = dimensions[i].height.toFixed(2);
-                cellDepth.textContent = dimensions[i].depth.toFixed(2);
-                cellVolume.textContent = volumes[i].toFixed(2);
-            } else {
-                cellTumor.textContent = i + 1;
-                cellWidth.textContent = '';
-                cellHeight.textContent = '';
-                cellDepth.textContent = '';
-                cellVolume.textContent = '';
-            }
+        // If less than 8 tumors, add empty rows until there are 8 rows total
+        for (let i = dimensions.length; i < 8; i++) {
+            var row = tableBody.insertRow();
+            var cellTumor = row.insertCell(0);
+            var cellWidth = row.insertCell(1);
+            var cellHeight = row.insertCell(2);
+            var cellDepth = row.insertCell(3);
+            var cellVolume = row.insertCell(4);
+            
+            cellTumor.textContent = i + 1;
+            cellWidth.textContent = '';
+            cellHeight.textContent = '';
+            cellDepth.textContent = '';
+            cellVolume.textContent = '';
         }
     }
+    
+
     
 
 

@@ -41,6 +41,12 @@ body {
     background-color: #000000;
 }
 
+.bounding-box-label {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    color: red;
+}
+
 #tables-container {
     margin: 0; /* Removes margin around tables */
     padding: 0; /* Removes padding inside tables */
