@@ -54,9 +54,8 @@ body {
 
  /* Slider styles */
  #slider-container {
-    width: 50%;
+    width: 56%;
     border-radius: 5px;
-    margin-top: 15px;
     padding-top: 3px;
     padding-left: 15px;
     padding-right: 15px;
@@ -93,12 +92,6 @@ input[type='range'] {
     width: 100%;
     margin: 0; /* Removes margin around tables */
     padding: 0; /* Removes padding inside tables */
-}
-
-
-#slice-info{
-    margin-left: 1160px;
-    font-weight: bold;
 }
 
 

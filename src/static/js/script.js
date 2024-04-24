@@ -322,59 +322,12 @@ $(document).ready(function() {
                     dimensions,
                     volumes
                 });
+
             }).catch(function(error) {
                 console.error('Error loading segmentation image:', error);
             });
         }
     }
-
-    // function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
-    //     if (segmentationFiles.length > imageIndex) {
-    //         const subfolder = $('#segmentation-subfolder-select').val();
-    //         const filename = segmentationFiles[imageIndex];
-    //         console.log(segmentationFiles);
-    //         const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
-    //         cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
-    //             const pixelData = segmentationImage.getPixelData();
-
-    //             const width = segmentationImage.width;
-    //             const height = segmentationImage.height;
-
-    //             const canvas = document.createElement('canvas');
-    //             canvas.width = width;
-    //             canvas.height = height;
-    //             const context = canvas.getContext('2d');
-
-    //             // Use the labelConnectedComponents function to label the tumor areas
-    //             const labels = labelConnectedComponents(pixelData, width, height);
-
-    //             // Calculate bounding boxes for each label
-    //             const boundingBoxes = calculateBoundingBoxes(labels, width, height);
-
-    //             // Define margin size (e.g., 5 pixels)
-    //             const margin = 5;
-
-    //             // Draw bounding boxes
-    //             context.strokeStyle = 'red';
-    //             context.lineWidth = 2;
-    //             boundingBoxes.forEach(box => {
-    //                 if (box) { // Check if box is defined
-    //                     context.strokeRect(
-    //                         Math.max(box.minX - margin, 0), // Ensure x is not less than 0
-    //                         Math.max(box.minY - margin, 0), // Ensure y is not less than 0
-    //                         Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)), // Ensure width does not exceed canvas width
-    //                         Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin)) // Ensure height does not exceed canvas height
-    //                     );
-    //                 }
-    //             });
-
-    //             lastSegmentationCanvas = canvas;
-    //             overlaySegmentationOnDicomViewer(element, canvas);
-    //         }).catch(function(error) {
-    //             console.error('Error loading segmentation image:', error);
-    //         });
-    //     }
-    // }
 
     function calculateBoundingBoxes(labels, width, height) {
         let boundingBoxes = [];
@@ -398,10 +351,7 @@ $(document).ready(function() {
         return boundingBoxes;
     }
 
-    function updateTumorTable(dimensions, volumes, currentSlice) {
-        // Update the current slice info
-        document.getElementById('current-slice').textContent = currentSlice;
-    
+    function updateTumorTable(dimensions, volumes) {
         // Get the table body
         var tableBody = document.getElementById('tumor-table').getElementsByTagName('tbody')[0];
     
@@ -409,23 +359,30 @@ $(document).ready(function() {
         tableBody.innerHTML = '';
     
         // Add new rows for each tumor
-        dimensions.forEach(function(dimension, index) {
-            if (index < 10) { // Limit to 10 rows
-                var row = tableBody.insertRow();
-                var cellTumor = row.insertCell(0);
-                var cellWidth = row.insertCell(1);
-                var cellHeight = row.insertCell(2);
-                var cellDepth = row.insertCell(3);
-                var cellVolume = row.insertCell(4);
+        for (let i = 0; i < 8; i++) {
+            var row = tableBody.insertRow();
+            var cellTumor = row.insertCell(0);
+            var cellWidth = row.insertCell(1);
+            var cellHeight = row.insertCell(2);
+            var cellDepth = row.insertCell(3);
+            var cellVolume = row.insertCell(4);
     
-                cellTumor.textContent = index + 1;
-                cellWidth.textContent = dimension.width.toFixed(2);
-                cellHeight.textContent = dimension.height.toFixed(2);
-                cellDepth.textContent = dimension.depth.toFixed(2);
-                cellVolume.textContent = volumes[index].toFixed(2);
+            if (i < dimensions.length) {
+                cellTumor.textContent = i + 1;
+                cellWidth.textContent = dimensions[i].width.toFixed(2);
+                cellHeight.textContent = dimensions[i].height.toFixed(2);
+                cellDepth.textContent = dimensions[i].depth.toFixed(2);
+                cellVolume.textContent = volumes[i].toFixed(2);
+            } else {
+                cellTumor.textContent = i + 1;
+                cellWidth.textContent = '';
+                cellHeight.textContent = '';
+                cellDepth.textContent = '';
+                cellVolume.textContent = '';
             }
-        });
+        }
     }
+    
 
 
     function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
@@ -559,25 +516,8 @@ $(document).ready(function() {
         // Set the initial value display
         showSliderValue(); // <-- This is the new position of the call
 
-        // slider.addEventListener('input', function() {
-        //     loadDicomImage(parseInt(this.value, 10));
-        //     showSliderValue(); 
-        // });
-        // }   else {
-        //     // Handle the case where there are no DICOM files
-        //     rangeBullet.innerHTML = '0 / 0';
-        // }
     });
 
-
-    // // Adjusted scrolling event listener
-    // $(dicomViewerElement).on('mousewheel DOMMouseScroll', function(e) {
-    //     e.preventDefault();
-    //     const delta = e.originalEvent.wheelDelta || -e.originalEvent.detail;
-    //     currentIndex = Math.max(0, Math.min(currentIndex + (delta > 0 ? -1 : 1), dicomFiles.length - 1));
-    //     loadDicomImage(currentIndex);
-    //     updateProgressBar(currentIndex, dicomFiles.length); // Ensure the progress bar is updated on scroll
-    // });
 
     function updateProgressBar(currentIndex, totalFiles) {
         // Adjusted to account for zero-based indexing; ensures the first image shows some progress and the last image fills the bar
