@@ -23,11 +23,20 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
 app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
 app.config['SEGMENTED_PP_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_PP_FOLDER)
-
 app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+
+# Ensure UPLOAD_FOLDER exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Ensure EXTRACTED_FOLDER exists
+os.makedirs(app.config['EXTRACTED_FOLDER'], exist_ok=True)
+# Ensure SEGMENTED_FOLDER exists
+os.makedirs(app.config['SEGMENTED_FOLDER'], exist_ok=True)
+ 
+# Define the path to your 'src' directory relative to 'app.py'
+src_dir = os.path.abspath('src/')
 
 
 @app.route('/dicom-metadata/dummy')
@@ -46,16 +55,6 @@ def dicom_metadata_dummy():
         # ... add more fields as needed
     ]
     return jsonify(dummy_data)
- 
-# Ensure UPLOAD_FOLDER exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-# Ensure EXTRACTED_FOLDER exists
-os.makedirs(app.config['EXTRACTED_FOLDER'], exist_ok=True)
-# Ensure SEGMENTED_FOLDER exists
-os.makedirs(app.config['SEGMENTED_FOLDER'], exist_ok=True)
- 
-# Define the path to your 'src' directory relative to 'app.py'
-src_dir = os.path.abspath('src/')
  
 @app.route('/')
 def index():
@@ -138,6 +137,21 @@ def run_command(command):
         return {"success": True, "output": result.stdout}  # Success case
     except subprocess.CalledProcessError as e:
         return {"success": False, "error": e.stderr}  # Error case
+    
+def get_subfolders(directory, root_dir=None):
+    if root_dir is None:
+        root_dir = directory
+
+    subfolders_list = []
+    for item in os.scandir(directory):
+        if item.is_dir():
+            # Recursive call to get subfolders of subfolders
+            subfolder_paths = get_subfolders(item.path, root_dir)
+            # Only add subdirectories that are not the root directory
+            if item.path != root_dir:
+                subfolders_list.append(os.path.relpath(item.path, root_dir))
+            subfolders_list.extend(subfolder_paths)
+    return subfolders_list
 
 
         
@@ -214,33 +228,6 @@ def upload_segmentation_file():
         return redirect(url_for('index'))
     else:
         return 'Invalid file format or no file selected'
-
- 
-# @app.route('/dicom/<path:filename>')
-# def serve_dicom_file(filename):
-#     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
-
-def get_subfolders(directory, root_dir=None):
-    if root_dir is None:
-        root_dir = directory
-
-    subfolders_list = []
-    for item in os.scandir(directory):
-        if item.is_dir():
-            # Recursive call to get subfolders of subfolders
-            subfolder_paths = get_subfolders(item.path, root_dir)
-            # Only add subdirectories that are not the root directory
-            if item.path != root_dir:
-                subfolders_list.append(os.path.relpath(item.path, root_dir))
-            subfolders_list.extend(subfolder_paths)
-    return subfolders_list
-    
-# def get_subfolders(root_dir):
-#     subfolders = []
-#     for dirpath, dirs, files in os.walk(root_dir):
-#         for d in dirs:
-#             subfolders.append(os.path.join(dirpath, d))
-#     return subfolders
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
@@ -334,12 +321,6 @@ def list_segmentation_files():
     dicom_files.sort()
     return jsonify(dicom_files)
  
-# @app.after_request
-# def after_request(response):
-#     print("In after_request")
-#     print(response.headers)
-#     return response
- 
 @app.route('/dicom-metadata/<path:filepath>')
 def dicom_metadata(filepath):
     # Base directory where DICOM files are stored
@@ -405,14 +386,14 @@ def run_analysis():
     postprocess_result = run_command(postprocess_command)
     
     if not postprocess_result['success']:
-        return jsonify({"success": False, "message": "Postprocessing failed", "error": postprocessing_result['error']}), 500
+        return jsonify({"success": False, "message": "Postprocessing failed", "error": postprocess_result['error']}), 500
 
     
     return jsonify({
         "success": True,
         "message": "Analysis completed successfully",
         "prediction_output": prediction_result['output'],
-        "postprocessing_output": postprocessing_result['output']
+        "postprocessing_output": postprocess_result['output']
     })
     
     
