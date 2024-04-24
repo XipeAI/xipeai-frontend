@@ -245,6 +245,52 @@ $(document).ready(function() {
     
         return { dimensions, volumes };
     }
+
+    //andra boxing
+
+    function boxesAreClose(box1, box2) {
+        const threshold = 10; // Adjust this threshold to control the merging sensitivity
+        const closeHorizontally = box2.minX <= box1.maxX + threshold && box1.minX <= box2.maxX + threshold;
+        const closeVertically = box2.minY <= box1.maxY + threshold && box1.minY <= box2.maxY + threshold;
+        return closeHorizontally && closeVertically;
+    }
+
+    function mergeOverlappingBoundingBoxes(boundingBoxes) {
+        console.log("Initial boundingBoxes:", boundingBoxes);  // Check initial boxes
+    
+        let mergedBoxes = [];
+        boundingBoxes.forEach((box, index) => {
+            if (!box) return;
+            let merged = false;
+            mergedBoxes.forEach(mergedBox => {
+                if (boxesAreClose(mergedBox, box)) {
+                    mergedBox.minX = Math.min(mergedBox.minX, box.minX);
+                    mergedBox.minY = Math.min(mergedBox.minY, box.minY);
+                    mergedBox.maxX = Math.max(mergedBox.maxX, box.maxX);
+                    mergedBox.maxY = Math.max(mergedBox.maxY, box.maxY);
+                    merged = true;
+                }
+            });
+            if (!merged) {
+                mergedBoxes.push({...box});
+            }
+        });
+    
+        console.log("Merged boundingBoxes:", mergedBoxes);  // Check merged boxes
+        return mergedBoxes;
+    }
+
+    function updateBoundingBoxesWithMerging(boundingBoxes) {
+        const mergedBoxes = mergeOverlappingBoundingBoxes(boundingBoxes);
+        // Clear the original array
+        boundingBoxes.length = 0;
+        // Push the merged boxes into the original array
+        mergedBoxes.forEach(box => boundingBoxes.push(box));
+
+        return mergedBoxes;
+    }
+
+    //end
     
     // Function to retrieve pixel spacing and slice thickness from DICOM metadata
     function getPixelSpacingAndSliceThickness(segmentationImage) {
@@ -279,11 +325,14 @@ $(document).ready(function() {
                 console.log("Labels: ", labels);
                 const boundingBoxes = calculateBoundingBoxes(labels, width, height);
                 console.log("Bounding Boxes: ", boundingBoxes);
-    
+                const mergedBoxes = updateBoundingBoxesWithMerging(boundingBoxes);
+
                 const { pixelSpacing} = getPixelSpacingAndSliceThickness(segmentationImage);
                 const sliceThickness = 5;
                 console.log("Pixel Spacing: ", pixelSpacing, "Slice Thickness: ", sliceThickness);
-                const { dimensions, volumes } = calculateRealWorldMeasurements(boundingBoxes, pixelSpacing, sliceThickness);
+
+                const { dimensions, volumes } = calculateRealWorldMeasurements(mergedBoxes, pixelSpacing, sliceThickness);
+
                 //updateTumorTable(dimensions, volumes, currentSliceIndex);
                 console.log('Tumor Dimensions:', dimensions);
                 console.log('Tumor Volumes:', volumes);
@@ -295,9 +344,10 @@ $(document).ready(function() {
                 context.strokeStyle = 'red';
                 context.lineWidth = 2;
                 console.log('Volumes array:', volumes);
-                boundingBoxes.forEach((box, index) => {
+
+                mergedBoxes.forEach((box, index) => {
                     if (box) {
-                        const volumeIndex = index - 1;
+                        const volumeIndex = index;
                         const volume = volumes[volumeIndex];
                         const volumeText = volume !== undefined ? `Volume: ${volume.toFixed(2)} mm³` : 'Volume: N/A';
                         const lesionLabel = `Lesion ${index + 1}`; // Assuming you want 1-based indexing for display
