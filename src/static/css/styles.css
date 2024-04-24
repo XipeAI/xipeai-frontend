@@ -1,0 +1,384 @@
+/* Base styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+/* Add styles for the header-title class */
+.header-title {
+    background-color: #009879; /* Replace with the color you want */
+    color: #ffffff; /* Optional: Change the text color if needed */
+    padding: 30px; /* Optional: Add some padding */
+    margin-top: 0;
+    text-align: center;
+}
+
+/* Flex container */
+#layout {
+    display: flex;
+    flex-direction: row; /* Align children in a row */
+    align-items: flex-start; /* Align children at their top edge */
+    justify-content: space-around; /* Distributes space around items */
+    padding: 20px;
+    gap: 20px; /* Adds space between flex items */
+}
+
+/* DICOM Viewer styles */
+#dicomViewer {
+    flex: 3; /* Allocate half of the available space */
+    width: 1000px;
+    height: 500px; /* New height for the DICOM viewer */
+    display: flex; /* Use flexbox for centering the content */
+    justify-content: center; /* Center horizontally in the flex container */
+    align-items: center; /* Center vertically in the flex container */
+    border: 5px solid #009879; /* A light grey border */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* A subtle shadow for depth */
+    padding: 10px;
+    background-color: #000000;
+}
+
+#tables-container {
+    margin: 0; /* Removes margin around tables */
+    padding: 0; /* Removes padding inside tables */
+    flex: 2;
+    display: flex;
+    flex-direction: column; /* Stack the tables vertically */
+    gap: 20px;
+    
+}
+
+
+ /* Slider styles */
+ #slider-container {
+    width: 56%;
+    border-radius: 5px;
+    padding-top: 3px;
+    padding-left: 15px;
+    padding-right: 15px;
+
+    outline: none;
+}
+
+input[type='range'] {
+    width: 100%;
+    cursor: pointer;
+}
+
+.rs-label {          
+    position: relative;
+    transform-origin: center center;
+    display: block;
+    width: 60px;
+    height: 60px;
+    line-height: 30px;
+    text-align: center;
+    font-weight: bold;
+    padding-top: 7px;
+    font-weight: bold;
+    box-sizing: border-box;
+    color:#009879;
+    font-style: normal;
+    line-height: normal;
+    font-size: 15px;
+}
+
+
+/* DICOM Metadata Table styles */
+#dicom-metadata-table, #tumor-table {
+    width: 100%;
+    margin: 0; /* Removes margin around tables */
+    padding: 0; /* Removes padding inside tables */
+}
+
+
+#dicom-metadata-table th, #dicom-metadata-table td,
+#tumor-table th, #tumor-table td {
+    border: 1px solid #ddd; /* Consistent with the viewer border */
+    padding: 10px; /* More space for content */
+    text-align: left; /* Align text to the left */
+}
+
+#dicom-metadata-table th, #tumor-table th {
+    background-color: #009879;
+    color: #ffffff;
+}
+
+#dicom-metadata-table tr:nth-of-type(even), #tumor-table tr:nth-of-type(even) {
+    background-color: #d4d4d4;
+}
+
+#dicom-metadata-table tbody tr:last-of-type, #tumor-table tbody tr:last-of-type {
+    border-bottom: 2px solid #009879;
+}
+
+
+   
+/* Responsive Design */
+@media (max-width: 768px) {
+    /* Stack the layout on smaller screens */
+    #layout {
+        flex-direction: column;
+    }
+
+    #dicomViewer,
+    #tables-container {
+        width: 100%; /* Full width on smaller screens */
+        /*margin-left: 0; /* Remove the margin on smaller screens */
+    }  
+}
+
+/* Style for file input */
+input[type="file"] {
+        display: none; /* Hide the default file input */
+        
+}
+
+.custom-file-upload {
+        border: 1px solid #ccc;
+        display: inline-block;
+        padding: 6px 12px;
+        font-size: medium;
+        cursor: pointer;
+        margin-right: 15px;
+        background-color: #009879; /* Change background color */
+        color: #fff; /* Change text color */
+        border-radius: 4px; /* Add rounded corners */
+        transition: background-color 0.3s ease; 
+        font-weight: bold;
+        
+}
+
+.cornerstone-canvas{
+    width: 1000px;
+    display: block;
+}
+/* Style for upload button */
+input[type="submit"] {
+        border: none;
+        background-color: #009879; /* Change background color */
+        color: #fff; /* Change text color */
+        padding: 10px 20px; /* Adjust padding */
+        border-radius: 4px; /* Add rounded corners */
+        cursor: pointer;
+        font-size: medium;
+        margin-left: 15px;
+        transition: background-color 0.3s ease;
+        font-weight: bold;
+}
+
+input[type="submit"]:hover {
+    background-color: #007b66; /* Darken color on hover */
+}
+
+.upload-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start; /* Align the tops of the containers */
+    margin-top: 40px; /* Space from the title or any element above */
+}
+
+.upload-section {
+    display: flex;
+    flex-direction: column; /* Stack elements vertically */
+    align-items: center; /* Center items horizontally */
+    width: 48%; /* Slightly less than half to fit two sections */
+
+}
+
+
+#dicom-upload-form, 
+#segmentation-upload-form,
+#dicom-subfolder-select,
+#segmentation-subfolder-select {
+    margin-bottom: 10px; /* Add some margin between the elements */
+}
+
+
+#subfolder-container {
+    margin: 10px 0;
+    margin-top: 10px;
+    display: flex;
+    margin-bottom: 30px;
+
+    color: #009879;
+    justify-content: center; /* Center the dropdown and button */
+    align-items: baseline;
+    font-weight: 600;
+    font-size:large;
+    font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+
+}
+
+#subfolder-select, #analyse-btn {
+    padding: 10px;
+    margin-left: 20px;
+    margin-top: 10px;
+    margin-right: 0px; /* Add some space between the select and button */
+    border: 2px solid #009879; /* Add a border matching your theme */
+    border-radius: 5px; /* Rounded corners */
+    background-color: #fff; /* White background for the dropdown */
+    color: #009879; /* Text color to match the theme */
+    font-size: 16px; /* Slightly larger font size for better readability */
+    cursor: pointer; /* Change cursor to indicate clickable items */
+}
+
+#subfolder-select:focus, #analyse-btn:focus {
+    outline: none; /* Remove default focus outline */
+    box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+}
+
+#analyse-btn {
+    background-color: #009879; /* Match the primary color theme for the button */
+    color: #ffffff; /* White text for the button */
+    font-weight: bold; /* Make button text bold */
+    transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+}
+
+#analyse-btn:hover {
+    background-color: #006050; /* Darker shade on hover for the button */
+}
+
+@media (max-width: 768px) {
+    .upload-container {
+        flex-direction: column;
+    }
+
+    .upload-section {
+        width: auto; /* Full width on smaller screens */
+    }
+}
+
+/*Segmantation section*/
+
+#segmentation-subfolder-container {
+    margin: 10px 0;
+    margin-top: 10px;
+    display: flex;
+    color: #009879;
+    justify-content: center; /* Center the dropdown and button */
+    align-items: baseline;
+    font-weight: 600;
+    font-size:large;
+    font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+#segmentation-subfolder-select, #analyse-segmentation-btn {
+    padding: 10px;
+    margin-left: 20px;
+    margin-top: 10px;
+    margin-right: 0px; /* Add some space between the select and button */
+    border: 2px solid #009879; /* Add a border matching your theme */
+    border-radius: 5px; /* Rounded corners */
+    background-color: #fff; /* White background for the dropdown */
+    color: #009879; /* Text color to match the theme */
+    font-size: 16px; /* Slightly larger font size for better readability */
+    cursor: pointer; /* Change cursor to indicate clickable items */
+}
+
+#segmentation-subfolder-select:focus, #analyse-segmentation-btn:focus {
+    outline: none; /* Remove default focus outline */
+    box-shadow: 0 0 3px #007b66; /* Add a subtle focus effect */
+}
+
+#analyse-segmentation-btn {
+    background-color: #009879; /* Match the primary color theme for the button */
+    color: #ffffff; /* White text for the button */
+    font-weight: bold; /* Make button text bold */
+    transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+}
+
+#analyse-segmentation-btn:hover {
+    background-color: #006050; /* Darker shade on hover for the button */
+}
+
+#windowing-controls{
+    margin-top: 30px;
+    font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    font-weight: 650;
+    color: #009879;
+}
+
+
+/* #segmentation-controls button {
+    padding: 10px;
+    margin: 5px;
+    border: 1px solid #009879;
+    background-color: #fff;
+    color: #009879;
+    border-radius: 5px;
+    cursor: pointer;
+} */
+
+.switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+        }
+
+switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        }
+        .toggle-slider {
+position: absolute;
+cursor: pointer;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background-color: #ccc;
+-webkit-transition: .4s;
+transition: .4s;
+}
+
+.toggle-slider:before {
+position: absolute;
+content: "";
+height: 26px;
+width: 26px;
+left: 4px;
+bottom: 4px;
+background-color: white;
+-webkit-transition: .4s;
+transition: .4s;
+}
+
+input:checked + .toggle-slider {
+background-color: #2196F3;
+}
+
+input:focus + .toggle-slider {
+box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .toggle-slider:before {
+-webkit-transform: translateX(26px);
+-ms-transform: translateX(26px);
+transform: translateX(26px);
+}
+
+.toggle-slider.round {
+border-radius: 34px;
+}
+
+.toggle-slider.round:before {
+border-radius: 50%;
+}
+#label-colored, #label-bounding-boxes {
+    color: #009879; /* Your preferred text color */
+    font-weight: bold;
+    /* Other styling as needed */
+    }
+
+    /* You might want to adjust the styling of the #segmentation-toggle container too */
+#segmentation-toggle {
+    display: flex;
+    align-items: center;
+    /* Add any other styles such as padding, etc., here */
+    }

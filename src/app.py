@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
 from flask_cors import CORS
 import zipfile
 import shutil
@@ -8,6 +8,7 @@ import pydicom
 from pydicom.data import get_testdata_files
 import secrets
 from urllib.parse import unquote
+import dicom2nifti
 
 
 app = Flask(__name__)
@@ -15,9 +16,11 @@ CORS(app, origins=["http://127.0.0.1:5000"])
 UPLOAD_FOLDER = 'uploads'
 EXTRACTED_FOLDER = 'extracted'
 SEGMENTED_FOLDER = 'segmented'
+NIFTI_FOLDER = 'nifti_extracted'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
 app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
+app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
 
@@ -52,9 +55,9 @@ src_dir = os.path.abspath('src/')
 @app.route('/')
 def index():
     # Specify the path and file you want to serve
-    return send_from_directory(src_dir, 'index.html')
+    return render_template('index.html')
  
-def remove_spaces_from_folders(root_dir):
+def remove_spaces_from_folders(root_dir, file_id):
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
         # Rename files with spaces
         for filename in filenames:
@@ -67,7 +70,7 @@ def remove_spaces_from_folders(root_dir):
         # Rename directories with spaces
         for dirname in dirnames:
             if ' ' in dirname:
-                new_dirname = dirname.replace(' ', '_')
+                new_dirname = file_id[-8:-4]
                 old_dir_path = os.path.join(dirpath, dirname)
                 new_dir_path = os.path.join(dirpath, new_dirname)
                 
@@ -84,6 +87,22 @@ def clear_directory(directory):
             os.remove(os.path.join(root, name))
         for name in dirs:
             os.rmdir(os.path.join(root, name))
+
+def process_dicom_series(extracted_folder, nifti_output_folder, file_id):
+    for root, dirs, files in os.walk(extracted_folder):
+        if files:  # If there are files in the directory, assume it's a DICOM series
+            subfolder_name = os.path.basename(root)
+            subfolder_name = os.path.join(file_id[-8:-4], subfolder_name)
+            nifti_subfolder_path = os.path.join(nifti_output_folder, subfolder_name)
+            os.makedirs(nifti_subfolder_path, exist_ok=True)  # Ensure subfolder exists
+            
+            try:
+                dicom2nifti.convert_directory(root, nifti_subfolder_path)
+                print(f"Converted DICOM series in {root} to NIfTI in {nifti_subfolder_path}")
+            except Exception as e:
+                print(f"Error converting DICOM series in {root}: {e}")
+                # Optionally, use `flash(f"Error converting DICOM series in {root}: {e}")` to send feedback to the template
+
 
         
 @app.route('/upload', methods=['POST'])
@@ -109,11 +128,17 @@ def upload_file():
                     if not os.path.isdir(target_path):  # Avoid trying to extract directories directly
                         zip_ref.extract(member, app.config['EXTRACTED_FOLDER'])
 
-        remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'])
+        remove_spaces_from_folders(app.config['EXTRACTED_FOLDER'], file.filename)
 
         # Get the list of subfolders
         dicom_subfolders = get_subfolders(app.config['EXTRACTED_FOLDER'])
         session['dicom_subfolders'] = dicom_subfolders  # Only update the DICOM subfolders
+
+        # After successfully extracting the files:
+        try:
+            process_dicom_series(app.config['EXTRACTED_FOLDER'], app.config['NIFTI_FOLDER'], file.filename)
+        except Exception as e:
+            return str(e), 500
 
 
         return redirect(url_for('index'))
@@ -144,7 +169,7 @@ def upload_segmentation_file():
             zip_ref.extractall(app.config['SEGMENTED_FOLDER'])
 
         # After extracting files:
-        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
+        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'], file.filename)
 
         # Get the list of subfolders
         segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
@@ -155,9 +180,6 @@ def upload_segmentation_file():
         return 'Invalid file format or no file selected'
 
  
-# @app.route('/dicom/<path:filename>')
-# def serve_dicom_file(filename):
-#     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
 
 def get_subfolders(directory, root_dir=None):
     if root_dir is None:
@@ -174,12 +196,6 @@ def get_subfolders(directory, root_dir=None):
             subfolders_list.extend(subfolder_paths)
     return subfolders_list
     
-# def get_subfolders(root_dir):
-#     subfolders = []
-#     for dirpath, dirs, files in os.walk(root_dir):
-#         for d in dirs:
-#             subfolders.append(os.path.join(dirpath, d))
-#     return subfolders
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
@@ -272,13 +288,7 @@ def list_segmentation_files():
     # Sort the list of DICOM files alphabetically by their relative paths
     dicom_files.sort()
     return jsonify(dicom_files)
- 
-# @app.after_request
-# def after_request(response):
-#     print("In after_request")
-#     print(response.headers)
-#     return response
- 
+
 @app.route('/dicom-metadata/<path:filepath>')
 def dicom_metadata(filepath):
     # Base directory where DICOM files are stored
