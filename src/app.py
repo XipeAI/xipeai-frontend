@@ -169,7 +169,7 @@ def upload_segmentation_file():
             zip_ref.extractall(app.config['SEGMENTED_FOLDER'])
 
         # After extracting files:
-        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
+        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'], file.filename)
 
         # Get the list of subfolders
         segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
@@ -180,9 +180,6 @@ def upload_segmentation_file():
         return 'Invalid file format or no file selected'
 
  
-# @app.route('/dicom/<path:filename>')
-# def serve_dicom_file(filename):
-#     return send_from_directory('uploads/extracted/Unnamed_-_0', filename)
 
 def get_subfolders(directory, root_dir=None):
     if root_dir is None:
@@ -199,12 +196,6 @@ def get_subfolders(directory, root_dir=None):
             subfolders_list.extend(subfolder_paths)
     return subfolders_list
     
-# def get_subfolders(root_dir):
-#     subfolders = []
-#     for dirpath, dirs, files in os.walk(root_dir):
-#         for d in dirs:
-#             subfolders.append(os.path.join(dirpath, d))
-#     return subfolders
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
@@ -297,13 +288,7 @@ def list_segmentation_files():
     # Sort the list of DICOM files alphabetically by their relative paths
     dicom_files.sort()
     return jsonify(dicom_files)
- 
-# @app.after_request
-# def after_request(response):
-#     print("In after_request")
-#     print(response.headers)
-#     return response
- 
+
 @app.route('/dicom-metadata/<path:filepath>')
 def dicom_metadata(filepath):
     # Base directory where DICOM files are stored
