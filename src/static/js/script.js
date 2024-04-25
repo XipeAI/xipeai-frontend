@@ -130,7 +130,7 @@ $(document).ready(function() {
         imageIndex = Math.max(0, Math.min(imageIndex, dicomFiles.length - 1));
         const subfolder = $('#subfolder-select').val(); 
         const filename = dicomFiles[imageIndex];
-        const imageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${filename}`;
+        const imageId = `wadouri:http://127.0.0.1:5001/dicom/${subfolder}/${filename}`;
 
         cornerstone.loadImage(imageId).then(function(image) {
             cornerstone.displayImage(element, image);
@@ -151,7 +151,7 @@ $(document).ready(function() {
             const subfolder = $('#segmentation-subfolder-select').val(); 
             const filename = segmentationFiles[imageIndex];
             console.log(segmentationFiles)
-            const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmentation/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 const pixelData = segmentationImage.getPixelData();
                 
@@ -230,7 +230,7 @@ $(document).ready(function() {
             const subfolder = $('#segmentation-subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
             console.log(segmentationFiles);
-            const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmentation/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 const pixelData = segmentationImage.getPixelData();
 
@@ -603,4 +603,32 @@ $(document).ready(function() {
         }
     });
 
+    // Trigger the loading screen on form submission
+    $('form').submit(function(event) {
+        $('#loading-screen').show();
+    });
+
+    // Assuming you're using AJAX to handle the form submission:
+    $('form').on('submit', function(e) {
+        e.preventDefault();  // Prevent the default form submission
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(data) {
+                console.log('Upload successful');
+                $('#loading-screen').hide();
+                // Handle success
+            },
+            error: function(data) {
+                console.error('Upload failed');
+                $('#loading-screen').hide();
+                // Handle error
+            }
+        });
+    });
 });
