@@ -1,4 +1,8 @@
+import sys
 import os
+# Append the parent directory to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import subprocess
 from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
 from flask_cors import CORS
@@ -10,6 +14,7 @@ from pydicom.data import get_testdata_files
 import secrets
 from urllib.parse import unquote
 import dicom2nifti
+import utils.format_transformation as utils
 
 
 app = Flask(__name__)
@@ -19,11 +24,13 @@ EXTRACTED_FOLDER = 'extracted'
 SEGMENTED_FOLDER = 'segmented'
 SEGMENTED_PP_FOLDER = 'segmented_pp'
 NIFTI_FOLDER = 'nifti_extracted'
+SEGMENTED_DICOM = 'segmented_dicom'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['EXTRACTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, EXTRACTED_FOLDER)
 app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
 app.config['SEGMENTED_PP_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_PP_FOLDER)
 app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
+app.config['SEGMENTED_DICOM'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_DICOM)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
@@ -34,6 +41,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['EXTRACTED_FOLDER'], exist_ok=True)
 # Ensure SEGMENTED_FOLDER exists
 os.makedirs(app.config['SEGMENTED_FOLDER'], exist_ok=True)
+# Ensure SEGMENTED_DICOM exists
+os.makedirs(app.config['SEGMENTED_DICOM'], exist_ok=True)
  
 # Define the path to your 'src' directory relative to 'app.py'
 src_dir = os.path.abspath('src/')
@@ -153,6 +162,13 @@ def get_subfolders(directory, root_dir=None):
             subfolders_list.extend(subfolder_paths)
     return subfolders_list
 
+def find_nii_gz_file(directory):
+    """ Returns the name of the first .nii.gz file found in the specified directory. """
+    for file in os.listdir(directory):
+        if file.endswith('.nii.gz'):
+            return file
+    return None  # Return None if no .nii.gz file is found
+
 
         
 @app.route('/upload', methods=['POST'])
@@ -234,9 +250,11 @@ def get_subfolders_route():
     # Return the list of DICOM subfolders stored in the session
     dicom_subfolders = session.get('dicom_subfolders', [])
     segmentation_subfolders = session.get('segmentation_subfolders', [])
+    segmented_dicom_subfolders = session.get('segmented_dicom_subfolders', [])
     return jsonify({
         'dicom_subfolders': dicom_subfolders,
-        'segmentation_subfolders': segmentation_subfolders
+        'segmentation_subfolders': segmentation_subfolders,
+        'segmented_dicom_subfolders': segmented_dicom_subfolders
     })
  
 @app.route('/dicom/<path:filename>')
@@ -268,6 +286,16 @@ def serve_segmentation_file(filename):
         return "File not found", 404
     
     return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
+
+@app.route('/segmented-dicom/<path:filename>')
+def serve_segmented_dicom(filename):
+    """Serve segmented DICOM files."""
+    base_dir = os.path.abspath(app.config['SEGMENTED_DICOM'])
+    file_path = safe_join(base_dir, filename)
+    if not os.path.exists(file_path):
+        return "File not found", 404
+    return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
+
 
 @app.route('/list-dicom-files')
 def list_dicom_files():
@@ -305,6 +333,32 @@ def list_segmentation_files():
     
     # Ensure the subfolder exists
     subfolder_path = os.path.join(app.config['SEGMENTED_FOLDER'], selected_subfolder)
+    if not os.path.exists(subfolder_path):
+        return jsonify({"error": "Subfolder not found"}), 404
+
+    # List DICOM files
+    dicom_files = []
+    for root, dirs, files in os.walk(subfolder_path):
+        for file in files:
+            if file.lower().endswith('.dcm'):
+                # Generate a relative path to the file from the EXTRACTED_FOLDER
+                relative_path = os.path.relpath(os.path.join(root, file), start=root)
+                dicom_files.append(relative_path)
+
+    # Sort the list of DICOM files alphabetically by their relative paths
+    dicom_files.sort()
+    return jsonify(dicom_files)
+
+@app.route('/list-segmented-dicom-files')
+def list_segmented_dicom_files():
+    selected_subfolder = request.args.get('subfolder')
+    print(f"Requested subfolder: {selected_subfolder}")  # For debugging
+
+    if selected_subfolder is None:
+        return jsonify({"error": "No subfolder provided"}), 400
+    
+    # Ensure the subfolder exists
+    subfolder_path = os.path.join(app.config['SEGMENTED_DICOM'], selected_subfolder)
     if not os.path.exists(subfolder_path):
         return jsonify({"error": "Subfolder not found"}), 404
 
@@ -374,6 +428,11 @@ def run_analysis():
     output_pp_folder = safe_join(output_pp_folder, subfolder)
     os.makedirs(output_pp_folder, exist_ok=True)
     
+    # construct segmented_dicom folder
+    segmented_dicom_folder = os.path.abspath(app.config['SEGMENTED_DICOM'])
+    segmented_dicom_folder = safe_join(segmented_dicom_folder, subfolder)
+    os.makedirs(segmented_dicom_folder, exist_ok=True)
+    
     # Command 1: Predicting with nnUNet
     predict_command = f'nnUNetv2_predict -d Dataset001_Liver -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
     prediction_result = run_command(predict_command)
@@ -387,7 +446,16 @@ def run_analysis():
     
     if not postprocess_result['success']:
         return jsonify({"success": False, "message": "Postprocessing failed", "error": postprocess_result['error']}), 500
-
+    
+    
+    nifti_name = find_nii_gz_file(output_pp_folder)
+    if nifti_name:
+        input_dir = f"{output_pp_folder}/{nifti_name}"
+        utils.nifti2dicom_1file(input_dir, segmented_dicom_folder)
+        
+    # Get the list of subfolders
+    segmented_dicom_subfolders = get_subfolders(app.config['SEGMENTED_DICOM'])
+    session['segmented_dicom_subfolders'] = segmented_dicom_subfolders  # Only update the DICOM subfolders
     
     return jsonify({
         "success": True,
@@ -395,6 +463,7 @@ def run_analysis():
         "prediction_output": prediction_result['output'],
         "postprocessing_output": postprocess_result['output']
     })
+    
     
     
     

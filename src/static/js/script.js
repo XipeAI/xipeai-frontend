@@ -97,7 +97,7 @@ $(document).ready(function() {
     }
 
     function loadSegmentationImagesForSubfolder(subfolder) {
-        $.getJSON(`/list-segmentation-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+        $.getJSON(`/list-segmented-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
             segmentationFiles = files;
             if(segmentationFiles.length === 0) {
                 console.log("No segmentation files found in the selected subfolder.");
@@ -135,7 +135,6 @@ $(document).ready(function() {
         cornerstone.loadImage(imageId).then(function(image) {
             cornerstone.displayImage(element, image);
             applyWindowing()
-            console.log(segmentationFiles)
             updateSegmentationDisplay();
             fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
         }).catch(function(error) {
@@ -148,10 +147,9 @@ $(document).ready(function() {
 
     function loadAndOverlaySegmentation(imageIndex) {
         if (segmentationFiles.length > imageIndex) {
-            const subfolder = $('#segmentation-subfolder-select').val(); 
+            const subfolder = $('#subfolder-select').val(); 
             const filename = segmentationFiles[imageIndex];
-            console.log(segmentationFiles)
-            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmentation/${subfolder}/${filename}`;
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmented-dicom/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 const pixelData = segmentationImage.getPixelData();
                 
@@ -165,7 +163,8 @@ $(document).ready(function() {
 
                 for (let i = 0; i < pixelData.length; i++) {
                     const index = i * 4; 
-                    if (pixelData[i] === 1) { // Liver, for example
+                    if (pixelData[i] === 0) { // Liver, for example
+                        console.log('LIVER')
                         data[index] = 0;
                         data[index + 1] = 255;
                         data[index + 2] = 0;
@@ -227,10 +226,9 @@ $(document).ready(function() {
 
     function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
         if (segmentationFiles.length > imageIndex) {
-            const subfolder = $('#segmentation-subfolder-select').val();
+            const subfolder = $('#subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
-            console.log(segmentationFiles);
-            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmentation/${subfolder}/${filename}`;
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmented-dicom/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 const pixelData = segmentationImage.getPixelData();
 
@@ -548,6 +546,7 @@ $(document).ready(function() {
     $('#subfolder-select').change(function() {
         const selectedSubfolder = $(this).val();
         loadDicomImagesForSubfolder(selectedSubfolder);// Trigger loading DICOM files for the selected subfolder
+        loadSegmentationImagesForSubfolder(selectedSubfolder);
         checkAndEnableAnalyseButton(selectedSubfolder);
     });
 
@@ -574,7 +573,10 @@ $(document).ready(function() {
     // Event listener for the Analyse button
     $('#analyse-btn').click(function() {
         var selectedSubfolder = $('#subfolder-select').val();
-        
+
+        // Show the loading screen when the analysis starts
+        $('#analyse-screen').show();
+
         $.ajax({
             url: '/run-analysis',
             type: 'POST',
@@ -585,9 +587,25 @@ $(document).ready(function() {
                 if (response.output) {
                     console.log('Analysis Output: ', response.output);
                 }
+
+                // Hide the loading screen whether success or failure
+                $('#analyse-screen').hide();
+
+                // After hiding the loading screen, check if a subfolder is selected and load segmentation images
+                if (selectedSubfolder) {
+                    loadSegmentationImagesForSubfolder(selectedSubfolder);
+                } else {
+                    alert("Please select a segmentation subfolder first.");
+                }
             },
             error: function(xhr) {
                 console.error('Analysis failed: ', xhr.responseJSON.error);
+
+                // Hide the loading screen on error as well
+                $('#analyse-screen').hide();
+
+                // Optionally, display an alert or another form of error message to the user
+                alert("Analysis failed: " + xhr.responseJSON.error);
             }
         });
     });
