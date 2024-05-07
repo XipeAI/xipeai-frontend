@@ -163,8 +163,7 @@ $(document).ready(function() {
 
                 for (let i = 0; i < pixelData.length; i++) {
                     const index = i * 4; 
-                    if (pixelData[i] === 0) { // Liver, for example
-                        console.log('LIVER')
+                    if (pixelData[i] === 1) { // Liver, for example
                         data[index] = 0;
                         data[index + 1] = 255;
                         data[index + 2] = 0;

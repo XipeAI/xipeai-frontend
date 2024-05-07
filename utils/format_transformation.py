@@ -24,7 +24,7 @@ def writeSlices(series_tag_values, new_img, i, out_dir):
     image_slice.SetMetaData("0020,0013", str(i)) # Instance Number
 
     # Write to the output directory and add the extension dcm, to force writing in DICOM format.
-    writer.SetFileName(os.path.join(out_dir,'slice' + str(i).zfill(4) + '.dcm'))
+    writer.SetFileName(os.path.join(out_dir,'slice' + str(i+1).zfill(4) + '.dcm'))
     writer.Execute(image_slice)
 
 
@@ -73,7 +73,7 @@ def nifti2dicom_mfiles(nifti_dir, out_dir=''):
     """
 
     # Adjust the pattern to match .nii files
-    nifti_files = glob(os.path.join(nifti_dir, '*.nii'))
+    nifti_files = glob(os.path.join(nifti_dir, '*.nii.gz'))
 
     for nifti_file in nifti_files:
         # Extract the base name of the nifti file to use as a subdirectory name for the DICOM files
