@@ -357,10 +357,8 @@ $(document).ready(function() {
     function fetchAndDisplayMetadata(fullPath) {
         // Building the URL by including the subfolder path
         const url = `/dicom-metadata/${fullPath}`;
-        console.log(`Fetching metadata from: ${url}`); // Debugging log
     
         $.getJSON(url, function(metadata) {
-            console.log('Metadata received:', metadata); // Debugging log
             populateMetadataTable(metadata);
         }).fail(function(jqXHR, textStatus, errorThrown) {
             console.error("Failed to load DICOM metadata:", textStatus, errorThrown);
@@ -640,11 +638,13 @@ $(document).ready(function() {
                 console.log('Upload successful');
                 $('#loading-screen').hide();
                 // Handle success
+                location.reload();
             },
             error: function(data) {
                 console.error('Upload failed');
                 $('#loading-screen').hide();
                 // Handle error
+                location.reload();
             }
         });
     });
