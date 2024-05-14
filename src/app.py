@@ -237,7 +237,7 @@ def upload_segmentation_file():
             zip_ref.extractall(app.config['SEGMENTED_FOLDER'])
 
         # After extracting files:
-        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'])
+        remove_spaces_from_folders(app.config['SEGMENTED_FOLDER'], file.filename)
 
         # Get the list of subfolders
         segmentation_subfolders = get_subfolders(app.config['SEGMENTED_FOLDER'])
@@ -246,6 +246,24 @@ def upload_segmentation_file():
         return redirect(url_for('index'))
     else:
         return 'Invalid file format or no file selected'
+
+ 
+
+def get_subfolders(directory, root_dir=None):
+    if root_dir is None:
+        root_dir = directory
+
+    subfolders_list = []
+    for item in os.scandir(directory):
+        if item.is_dir():
+            # Recursive call to get subfolders of subfolders
+            subfolder_paths = get_subfolders(item.path, root_dir)
+            # Only add subdirectories that are not the root directory
+            if item.path != root_dir:
+                subfolders_list.append(os.path.relpath(item.path, root_dir))
+            subfolders_list.extend(subfolder_paths)
+    return subfolders_list
+    
 
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():

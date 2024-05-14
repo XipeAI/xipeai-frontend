@@ -35,6 +35,7 @@
     </div>
 
     <h2 class="header-title">XipeAI | DICOM Viewer</h2>
+
     <hr>
 
     <div class="upload-container">
@@ -100,11 +101,29 @@
         <!-- DICOM Viewer -->
         <div id="dicomViewer"></div>
 
-        <!-- DICOM Metadata Table -->
-        <table id="dicom-metadata-table">
-            <tr><th>Field</th><th>Value</th></tr>
-            <!-- Metadata rows will be inserted here by JavaScript -->
-        </table>
+        <div id="tables-container"></div>
+            <!-- DICOM Metadata Table -->
+            <table id="dicom-metadata-table">
+                <tr><th>Field</th><th>Value</th></tr>
+                <!-- Metadata rows will be inserted here by JavaScript -->
+            </table>
+
+            <table id="tumor-table">
+                <thead>
+                    <tr>
+                        <th>Lesion</th>
+                        <th>Width</th>
+                        <th>Height</th>
+                        <th>Depth</th>
+                        <th>Volume</th>
+                    </tr>
+                </thead>
+                <tbody>
+                 <!-- Rows will be added dynamically using JavaScript -->
+                </tbody>
+            </table>
+
+        </div>
     </div>
 
     <!-- Slider Container placed below the DICOM Viewer and Metadata Table -->
@@ -113,5 +132,7 @@
     </div>
     <span id="rs-bullet" class="rs-label">0 / 0</span>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+
 </body>
 </html>
