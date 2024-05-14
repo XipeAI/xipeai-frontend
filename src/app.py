@@ -33,7 +33,7 @@ app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 app.config['SEGMENTED_DICOM'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_DICOM)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Ensure UPLOAD_FOLDER exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -43,6 +43,8 @@ os.makedirs(app.config['EXTRACTED_FOLDER'], exist_ok=True)
 os.makedirs(app.config['SEGMENTED_FOLDER'], exist_ok=True)
 # Ensure SEGMENTED_DICOM exists
 os.makedirs(app.config['SEGMENTED_DICOM'], exist_ok=True)
+# Ensure SEGMENTED_DICOM exists
+os.makedirs(app.config['SEGMENTED_PP_FOLDER'], exist_ok=True)
  
 # Define the path to your 'src' directory relative to 'app.py'
 src_dir = os.path.abspath('src/')
@@ -263,7 +265,7 @@ def serve_dicom_file(filename):
     print(f"Requested file: {filename}")
 
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
-    file_path = safe_join(base_dir, filename)
+    file_path = os.path.join(base_dir, filename)
     print(f"HERERERERERE: {file_path}")
 
     # Log the absolute file path for debugging
@@ -280,7 +282,7 @@ def serve_segmentation_file(filename):
     print(f"Requested file: {filename}")
 
     base_dir = os.path.abspath(app.config['SEGMENTED_FOLDER'])
-    file_path = safe_join(base_dir, filename)
+    file_path = os.path.join(base_dir, filename)
     
     if not os.path.exists(file_path):
         return "File not found", 404
@@ -291,7 +293,7 @@ def serve_segmentation_file(filename):
 def serve_segmented_dicom(filename):
     """Serve segmented DICOM files."""
     base_dir = os.path.abspath(app.config['SEGMENTED_DICOM'])
-    file_path = safe_join(base_dir, filename)
+    file_path = os.path.join(base_dir, filename)
     if not os.path.exists(file_path):
         return "File not found", 404
     return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
@@ -380,7 +382,7 @@ def dicom_metadata(filepath):
     # Base directory where DICOM files are stored
     base_dir = os.path.abspath(app.config['EXTRACTED_FOLDER'])
     # Create a secure, absolute file path
-    dicom_file_path = safe_join(base_dir, filepath)
+    dicom_file_path = os.path.join(base_dir, filepath)
 
     # Ensure the file exists
     if not os.path.exists(dicom_file_path):
@@ -416,21 +418,24 @@ def run_analysis():
     
     # construct input folder
     input_folder = os.path.abspath(app.config['NIFTI_FOLDER'])
-    input_folder = safe_join(input_folder, subfolder)
+    input_folder = os.path.join(input_folder, subfolder)
     
     # construct output folder
     output_folder = os.path.abspath(app.config['SEGMENTED_FOLDER'])
-    output_folder = safe_join(output_folder, subfolder)
+    print(output_folder)
+    print(subfolder)
+    output_folder = os.path.join(output_folder, subfolder)
+    print(output_folder)
     os.makedirs(output_folder, exist_ok=True)
     
     # construct output_pp folder
     output_pp_folder = os.path.abspath(app.config['SEGMENTED_PP_FOLDER'])
-    output_pp_folder = safe_join(output_pp_folder, subfolder)
+    output_pp_folder = os.path.join(output_pp_folder, subfolder)
     os.makedirs(output_pp_folder, exist_ok=True)
     
     # construct segmented_dicom folder
     segmented_dicom_folder = os.path.abspath(app.config['SEGMENTED_DICOM'])
-    segmented_dicom_folder = safe_join(segmented_dicom_folder, subfolder)
+    segmented_dicom_folder = os.path.join(segmented_dicom_folder, subfolder)
     os.makedirs(segmented_dicom_folder, exist_ok=True)
     
     # Command 1: Predicting with nnUNet
@@ -441,7 +446,7 @@ def run_analysis():
         return jsonify({"success": False, "message": "Prediction failed", "error": prediction_result['error']}), 500
 
     # Command 2: Applying postprocessing with nnUNet
-    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
+    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "C:/MyPythonProjects/XipeAI/test_data/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "C:/MyPythonProjects/XipeAI/test_data/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
     postprocess_result = run_command(postprocess_command)
     
     if not postprocess_result['success']:

@@ -2,10 +2,17 @@ import SimpleITK as sitk
 import os
 import time
 from glob import glob
+from werkzeug.utils import safe_join
 
 
-def writeSlices(series_tag_values, new_img, i, out_dir):
-    image_slice = new_img[:,:,i]
+def writeSlices(series_tag_values, new_img, i, out_dir, total_slices):
+    # Flipping the index to reverse the slice order
+    flipped_i = total_slices - 1 - i
+    image_slice = new_img[:,:,flipped_i]
+
+    # Flip the image slice vertically
+    image_slice = sitk.Flip(image_slice, [False, True, False])
+
     writer = sitk.ImageFileWriter()
     writer.KeepOriginalImageUIDOn()
 
@@ -15,25 +22,18 @@ def writeSlices(series_tag_values, new_img, i, out_dir):
     # Slice specific tags.
     image_slice.SetMetaData("0008|0012", time.strftime("%Y%m%d")) # Instance Creation Date
     image_slice.SetMetaData("0008|0013", time.strftime("%H%M%S")) # Instance Creation Time
-
-    # Setting the type to CT preserves the slice location.
-    image_slice.SetMetaData("0008|0060", "CT")  # set the type to CT so the thickness is carried over
-
-    # (0020, 0032) image position patient determines the 3D spacing between slices.
-    image_slice.SetMetaData("0020|0032", '\\'.join(map(str,new_img.TransformIndexToPhysicalPoint((0,0,i))))) # Image Position (Patient)
-    image_slice.SetMetaData("0020,0013", str(i)) # Instance Number
+    image_slice.SetMetaData("0008|0060", "CT")  # Set the type to CT
+    image_slice.SetMetaData("0020|0032", '\\'.join(map(str,new_img.TransformIndexToPhysicalPoint((0,0,flipped_i))))) # Image Position (Patient)
+    image_slice.SetMetaData("0020|0013", str(i + 1)) # Instance Number
 
     # Write to the output directory and add the extension dcm, to force writing in DICOM format.
-    writer.SetFileName(os.path.join(out_dir,'slice' + str(i+1).zfill(4) + '.dcm'))
+    writer.SetFileName(os.path.join(out_dir, 'slice' + str(i+1).zfill(4) + '.dcm'))
     writer.Execute(image_slice)
-
 
 def nifti2dicom_1file(in_dir, out_dir):
     """
     This function converts only one nifti file into a DICOM series.
-
-    `in_dir`: the path to the one nifti file
-    `out_dir`: the path to output
+    Flips the slices so the top becomes the bottom and bottom becomes the top.
     """
 
     os.makedirs(out_dir, exist_ok=True)
@@ -53,12 +53,14 @@ def nifti2dicom_1file(in_dir, out_dir):
                          ("0008|0021", modification_date),  # Series Date
                          ("0008|0008", "DERIVED\\SECONDARY"),  # Image Type
                          ("0020|000e", "1.2.826.0.1.3680043.2.1125." + modification_date + ".1" + modification_time),  # Series Instance UID
-                         ("0020|0037", '\\'.join(map(str, (direction[0], direction[3], direction[6],  # Image Orientation (Patient)
+                         ("0020|0037", '\\'.join(map(str, (direction[0], direction[3], direction[6],
                                                           direction[1], direction[4], direction[7])))),
                          ("0008|103e", "Created-Pycad")]  # Series Description
 
-    # Write slices to the output directory
-    list(map(lambda i: writeSlices(series_tag_values, new_img, i, out_dir), range(new_img.GetDepth())))
+    # Write slices to the output directory, flipping them along the z-axis
+    total_slices = new_img.GetDepth()
+    list(map(lambda i: writeSlices(series_tag_values, new_img, i, out_dir, total_slices), range(total_slices)))
+
 
 
 def nifti2dicom_mfiles(nifti_dir, out_dir=''):
@@ -86,11 +88,11 @@ def nifti2dicom_mfiles(nifti_dir, out_dir=''):
         # Call the conversion function on each nifti file
         nifti2dicom_1file(nifti_file, dicom_subdir)
 
-if __name__ == "__main__":
-    # add here your conversions you want to do
-    input_dir = '/Users/fabio22/Iwas/Xipe_Data/nifti/segmentations/segmentation-0.nii'
-    output_dir = '/Users/fabio22/Iwas/Xipe_Data/dicom/segmentations'
+# if __name__ == "__main__":
+    # # add here your conversions you want to do
+    # input_dir = '/Users/fabio22/Iwas/Xipe_Data/nifti/segmentations/segmentation-0.nii'
+    # output_dir = '/Users/fabio22/Iwas/Xipe_Data/dicom/segmentations'
 
-    nifti2dicom_1file(input_dir, output_dir)
+    # nifti2dicom_1file(input_dir, output_dir)
 
     
