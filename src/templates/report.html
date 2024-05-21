@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DICOM Report</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h2 class="header-title">DICOM Report</h2>
+
+    <div id="dicom-report-metadata">
+        <!-- Metadata will be dynamically inserted here -->
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            fetch('/dicom-metadata-report')
+                .then(response => response.json())
+                .then(metadata => {
+                    const reportContainer = document.getElementById('dicom-report-metadata');
+                    reportContainer.innerHTML = '';  // Clear previous content
+
+                    // Display general metadata
+                    for (const [key, value] of Object.entries(metadata)) {
+                        if (key !== "Tumor Information") {
+                            const p = document.createElement('p');
+                            p.textContent = `${key}: ${value}`;
+                            reportContainer.appendChild(p);
+                        }
+                    }
+
+                    // Display tumor information in a table
+                    if (metadata["Tumor Information"].length > 0) {
+                        const tumorTable = document.createElement('table');
+                        tumorTable.style.width = '100%';
+                        tumorTable.border = '1';
+                        
+                        const headerRow = document.createElement('tr');
+                        const headers = ['Lesion', 'Width', 'Height', 'Depth', 'Volume', 'Density'];
+                        headers.forEach(headerText => {
+                            const header = document.createElement('th');
+                            header.textContent = headerText;
+                            headerRow.appendChild(header);
+                        });
+                        tumorTable.appendChild(headerRow);
+                        
+                        metadata["Tumor Information"].forEach((tumorInfo, index) => {
+                            const row = document.createElement('tr');
+                            const cells = [
+                                index + 1, 
+                                tumorInfo['Width'] || '', 
+                                tumorInfo['Height'] || '', 
+                                tumorInfo['Depth'] || '', 
+                                tumorInfo['Volume'] || '', 
+                                tumorInfo['Density'] || ''
+                            ];
+                            cells.forEach(cellText => {
+                                const cell = document.createElement('td');
+                                cell.textContent = cellText;
+                                row.appendChild(cell);
+                            });
+                            tumorTable.appendChild(row);
+                        });
+                        reportContainer.appendChild(tumorTable);
+                    }
+                })
+                .catch(error => console.error('Error loading report metadata:', error));
+        });
+    </script>
+</body>
+</html>

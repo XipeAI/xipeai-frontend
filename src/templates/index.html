@@ -107,6 +107,7 @@
                 </tbody>
             </table>
 
+
         </div>
     </div>
 
@@ -117,6 +118,37 @@
     <span id="rs-bullet" class="rs-label">0 / 0</span>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
+    <div id="dicom-report-container">
+        <h3>DICOM Report</h3>
+        <button id="create-report">Generate Report</button>
+        <button id="open-report">Open Report in New Tab</button>
+    </div>
+
+    <script>
+        document.getElementById('create-report').addEventListener('click', function() {
+            fetch('/create-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error creating report:', data.error);
+                    alert(`Error: ${data.error}`);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error creating report:', error));
+        });
+
+        document.getElementById('open-report').addEventListener('click', function() {
+            window.open('/report-page', '_blank');
+        });
+    </script>
 
 </body>
 </html>

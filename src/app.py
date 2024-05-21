@@ -6,6 +6,8 @@ import shutil
 from werkzeug.utils import safe_join
 import pydicom
 from pydicom.data import get_testdata_files
+from pydicom.dataset import Dataset, FileDataset
+from datetime import datetime
 import secrets
 from urllib.parse import unquote
 import dicom2nifti
@@ -23,6 +25,134 @@ app.config['SEGMENTED_FOLDER'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_FOLDER)
 app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
+
+def create_dicom_report(output_path, patient_info, tumor_info):
+    file_meta = Dataset()
+    file_meta.MediaStorageSOPClassUID = pydicom.uid.generate_uid()
+    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+    file_meta.ImplementationClassUID = pydicom.uid.generate_uid()
+
+    ds = FileDataset(output_path, {}, file_meta=file_meta, preamble=b"\0" * 128)
+
+    ds.PatientName = patient_info['name']
+    ds.PatientID = patient_info['id']
+    ds.PatientBirthDate = patient_info['birth_date']
+    ds.StudyDate = datetime.now().strftime('%Y%m%d')
+    ds.StudyTime = datetime.now().strftime('%H%M%S')
+    ds.Modality = 'OT'
+    ds.StudyDescription = 'Tumor Analysis Report'
+
+    ds.add_new(0x0008103E, 'LO', 'Tumor Information')
+
+    for idx, tumor in enumerate(tumor_info, start=1):
+        tumor_str = f"Tumor {idx}: Width={tumor['width']:.2f}mm, Height={tumor['height']:.2f}mm, Depth={tumor['depth']:.2f}mm, Volume={tumor['volume']:.2f}mm³, Density={tumor['density']:.2f}"
+        ds.add_new(0x00200010 + idx, 'LO', tumor_str)
+        print(f"Added tumor info to DICOM: {tumor_str}")
+
+    ds.save_as(output_path)
+    print(f"Report saved as {output_path}")
+
+    print(f"Report saved as {output_path}")
+
+
+def extract_patient_and_tumor_info(dicom_files):
+    patient_info = {}
+    tumor_info = []
+
+    for dicom_file in dicom_files:
+        ds = pydicom.dcmread(dicom_file)
+        print(f"Reading DICOM file: {dicom_file}")
+
+        if not patient_info:
+            patient_info = {
+                'name': str(ds.PatientName) if 'PatientName' in ds else '',
+                'id': str(ds.PatientID) if 'PatientID' in ds else '',
+                'birth_date': str(ds.PatientBirthDate) if 'PatientBirthDate' in ds else ''
+            }
+            print(f"Extracted patient info: {patient_info}")
+
+        # Example logic to extract tumor information
+        # Replace this with your actual logic for extracting lesions
+        if hasattr(ds, 'SequenceOfUltrasoundRegions'):  # Example tag, replace with actual
+            for seq in ds.SequenceOfUltrasoundRegions:
+                tumor = {
+                    'width': float(seq.RegionLocationMaxX1) if 'RegionLocationMaxX1' in seq else 0.0,    # Example tag, replace with actual
+                    'height': float(seq.RegionLocationMaxY1) if 'RegionLocationMaxY1' in seq else 0.0,   # Example tag, replace with actual
+                    'depth': 5.0,  # Assuming fixed depth, replace with actual if available
+                    'volume': float(seq.RegionLocationMaxX1) * float(seq.RegionLocationMaxY1) * 5.0 if 'RegionLocationMaxX1' in seq and 'RegionLocationMaxY1' in seq else 0.0,  # Example calculation
+                    'density': float(seq.RegionSpatialFormat) if 'RegionSpatialFormat' in seq else 0.0  # Example tag, replace with actual
+                }
+                print(f"Extracted tumor info: {tumor}")
+                tumor_info.append(tumor)
+    
+    return patient_info, tumor_info
+
+
+
+
+
+@app.route('/create-report', methods=['POST'])
+def create_report():
+    dicom_files = []
+    for root, dirs, files in os.walk(app.config['EXTRACTED_FOLDER']):
+        for file in files:
+            if file.endswith('.dcm'):
+                dicom_files.append(os.path.join(root, file))
+
+    if not dicom_files:
+        return jsonify({"error": "No DICOM files found"}), 400
+    
+    try:
+        patient_info, tumor_info = extract_patient_and_tumor_info(dicom_files)
+        output_path = os.path.join(app.config['UPLOAD_FOLDER'], 'tumor_report.dcm')
+        
+        create_dicom_report(output_path, patient_info, tumor_info)
+        return jsonify({"message": "Report created successfully", "report_path": output_path})
+    except Exception as e:
+        print(f"Error creating report: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/view-report')
+def view_report():
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'tumor_report.dcm')
+    return send_from_directory(os.path.dirname(report_path), os.path.basename(report_path))
+
+@app.route('/dicom-metadata-report')
+def dicom_metadata_report():
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'tumor_report.dcm')
+    ds = pydicom.dcmread(report_path)
+
+    metadata = {
+        "Patient Name": str(ds.PatientName) if 'PatientName' in ds else '',
+        "Patient ID": str(ds.PatientID) if 'PatientID' in ds else '',
+        "Patient Birth Date": str(ds.PatientBirthDate) if 'PatientBirthDate' in ds else '',
+        "Study Date": str(ds.StudyDate) if 'StudyDate' in ds else '',
+        "Study Time": str(ds.StudyTime) if 'StudyTime' in ds else '',
+        "Modality": str(ds.Modality) if 'Modality' in ds else '',
+        "Study Description": str(ds.StudyDescription) if 'StudyDescription' in ds else '',
+        "Tumor Information": []
+    }
+
+    # Extract tumor information
+    for elem in ds:
+        if elem.tag.group == 0x0020 and elem.tag.element >= 0x0010:
+            print(f"Processing element: {elem}")
+            tumor_info = elem.value.split(',')
+            tumor_data = {}
+            for info in tumor_info:
+                if '=' in info:
+                    key, value = info.split('=')
+                    tumor_data[key.strip()] = value.strip()
+            metadata["Tumor Information"].append(tumor_data)
+            print(f"Extracted tumor data from report: {tumor_data}")
+
+    print(metadata)  # Log the metadata
+    return jsonify(metadata)
+
+
+@app.route('/report-page')
+def report_page():
+    return render_template('report.html')
 
 
 @app.route('/dicom-metadata/dummy')
@@ -56,6 +186,34 @@ src_dir = os.path.abspath('src/')
 def index():
     # Specify the path and file you want to serve
     return render_template('index.html')
+
+def create_dicom_report(output_path, patient_info, tumor_info):
+    # Create a new DICOM file
+    file_meta = Dataset()
+    file_meta.MediaStorageSOPClassUID = pydicom.uid.generate_uid()
+    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+    file_meta.ImplementationClassUID = pydicom.uid.generate_uid()
+    
+    ds = FileDataset(output_path, {}, file_meta=file_meta, preamble=b"\0" * 128)
+    
+    # Add patient information
+    ds.PatientName = patient_info['name']
+    ds.PatientID = patient_info['id']
+    ds.PatientBirthDate = patient_info['birth_date']
+    ds.StudyDate = datetime.now().strftime('%Y%m%d')
+    ds.StudyTime = datetime.now().strftime('%H%M%S')
+    ds.Modality = 'OT'  # Other
+    ds.StudyDescription = 'Tumor Analysis Report'
+    
+    # Add custom tumor information
+    ds.add_new(0x0008103E, 'LO', 'Tumor Information')
+    
+    for idx, tumor in enumerate(tumor_info, start=1):
+        ds.add_new(0x00200010 + idx, 'LO', f"Tumor {idx}: Volume={tumor['volume']:.2f}mm³, Density={tumor['density']:.2f}")
+    
+    # Save the DICOM file
+    ds.save_as(output_path)
+    print(f"Report saved as {output_path}")
  
 def remove_spaces_from_folders(root_dir, file_id):
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
