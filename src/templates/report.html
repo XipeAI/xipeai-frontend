@@ -17,6 +17,7 @@
             fetch('/dicom-metadata-report')
                 .then(response => response.json())
                 .then(metadata => {
+                    console.log("Metadata received:", metadata); // Debugging log
                     const reportContainer = document.getElementById('dicom-report-metadata');
                     reportContainer.innerHTML = '';  // Clear previous content
 

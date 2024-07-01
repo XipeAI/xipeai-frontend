@@ -52,8 +52,6 @@ def create_dicom_report(output_path, patient_info, tumor_info):
     ds.save_as(output_path)
     print(f"Report saved as {output_path}")
 
-    print(f"Report saved as {output_path}")
-
 
 def extract_patient_and_tumor_info(dicom_files):
     patient_info = {}
@@ -62,6 +60,7 @@ def extract_patient_and_tumor_info(dicom_files):
     for dicom_file in dicom_files:
         ds = pydicom.dcmread(dicom_file)
         print(f"Reading DICOM file: {dicom_file}")
+        print(ds)  # Log the entire DICOM dataset for debugging
 
         if not patient_info:
             patient_info = {
@@ -72,23 +71,22 @@ def extract_patient_and_tumor_info(dicom_files):
             print(f"Extracted patient info: {patient_info}")
 
         # Example logic to extract tumor information
-        # Replace this with your actual logic for extracting lesions
         if hasattr(ds, 'SequenceOfUltrasoundRegions'):  # Example tag, replace with actual
+            print(f"Found SequenceOfUltrasoundRegions in {dicom_file}")
             for seq in ds.SequenceOfUltrasoundRegions:
                 tumor = {
-                    'width': float(seq.RegionLocationMaxX1) if 'RegionLocationMaxX1' in seq else 0.0,    # Example tag, replace with actual
-                    'height': float(seq.RegionLocationMaxY1) if 'RegionLocationMaxY1' in seq else 0.0,   # Example tag, replace with actual
+                    'width': float(seq.RegionLocationMaxX1) if 'RegionLocationMaxX1' in seq else 0.0,
+                    'height': float(seq.RegionLocationMaxY1) if 'RegionLocationMaxY1' in seq else 0.0,
                     'depth': 5.0,  # Assuming fixed depth, replace with actual if available
                     'volume': float(seq.RegionLocationMaxX1) * float(seq.RegionLocationMaxY1) * 5.0 if 'RegionLocationMaxX1' in seq and 'RegionLocationMaxY1' in seq else 0.0,  # Example calculation
                     'density': float(seq.RegionSpatialFormat) if 'RegionSpatialFormat' in seq else 0.0  # Example tag, replace with actual
                 }
                 print(f"Extracted tumor info: {tumor}")
                 tumor_info.append(tumor)
+        else:
+            print(f"No SequenceOfUltrasoundRegions found in {dicom_file}")
     
     return patient_info, tumor_info
-
-
-
 
 
 @app.route('/create-report', methods=['POST'])
@@ -112,10 +110,12 @@ def create_report():
         print(f"Error creating report: {e}")
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/view-report')
 def view_report():
     report_path = os.path.join(app.config['UPLOAD_FOLDER'], 'tumor_report.dcm')
     return send_from_directory(os.path.dirname(report_path), os.path.basename(report_path))
+
 
 @app.route('/dicom-metadata-report')
 def dicom_metadata_report():
@@ -153,7 +153,6 @@ def dicom_metadata_report():
 @app.route('/report-page')
 def report_page():
     return render_template('report.html')
-
 
 @app.route('/dicom-metadata/dummy')
 def dicom_metadata_dummy():
