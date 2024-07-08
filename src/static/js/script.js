@@ -96,7 +96,7 @@ $(document).ready(function() {
     }
 
     function loadSegmentationImagesForSubfolder(subfolder) {
-        $.getJSON(`/list-segmentation-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+        $.getJSON(`/list-segmented-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
             segmentationFiles = files;
             if(segmentationFiles.length === 0) {
                 console.log("No segmentation files found in the selected subfolder.");
@@ -129,12 +129,11 @@ $(document).ready(function() {
         imageIndex = Math.max(0, Math.min(imageIndex, dicomFiles.length - 1));
         const subfolder = $('#subfolder-select').val(); 
         const filename = dicomFiles[imageIndex];
-        const imageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${filename}`;
+        const imageId = `wadouri:http://127.0.0.1:5001/dicom/${subfolder}/${filename}`;
 
         cornerstone.loadImage(imageId).then(function(image) {
             cornerstone.displayImage(element, image);
             applyWindowing()
-            console.log(segmentationFiles)
             updateSegmentationDisplay();
             fetchAndDisplayMetadata(subfolder + '/' + filename); // Fetch and display metadata for the loaded image
         }).catch(function(error) {
@@ -147,10 +146,9 @@ $(document).ready(function() {
 
     function loadAndOverlaySegmentation(imageIndex) {
         if (segmentationFiles.length > imageIndex) {
-            const subfolder = $('#segmentation-subfolder-select').val(); 
+            const subfolder = $('#subfolder-select').val(); 
             const filename = segmentationFiles[imageIndex];
-            console.log(segmentationFiles)
-            const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmented-dicom/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 const pixelData = segmentationImage.getPixelData();
                 
@@ -372,10 +370,9 @@ $(document).ready(function() {
         console.log("loadAndOverlaySegmentationWithBoundingBoxes called with index: ", imageIndex);
     // ... rest of the function
         if (segmentationFiles.length > imageIndex) {
-            const subfolder = $('#segmentation-subfolder-select').val();
+            const subfolder = $('#subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
-            const segmentationImageId = `wadouri:http://127.0.0.1:5000/segmentation/${subfolder}/${filename}`;
-    
+            const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmented-dicom/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
                 console.log("Segmentation image loaded: ", segmentationImage);
                 const pixelData = segmentationImage.getPixelData();
@@ -640,10 +637,8 @@ $(document).ready(function() {
     function fetchAndDisplayMetadata(fullPath) {
         // Building the URL by including the subfolder path
         const url = `/dicom-metadata/${fullPath}`;
-        console.log(`Fetching metadata from: ${url}`); // Debugging log
     
         $.getJSON(url, function(metadata) {
-            console.log('Metadata received:', metadata); // Debugging log
             populateMetadataTable(metadata);
         }).fail(function(jqXHR, textStatus, errorThrown) {
             console.error("Failed to load DICOM metadata:", textStatus, errorThrown);
@@ -775,6 +770,26 @@ $(document).ready(function() {
         // Update the position of the bullet relative to the slider
         rangeBullet.style.left = `calc(${bulletPosition}px + (${thumbWidth / 2}px))`; // Adjusted to include thumbWidth in calculation
     }
+
+    function checkAndEnableAnalyseButton(subfolder) {
+        if (subfolder) {
+            $.getJSON(`/list-dicom-files?subfolder=${encodeURIComponent(subfolder)}`, function(files) {
+                if (files && files.length > 0) {
+                    // DICOM files are present, enable the Analyse button
+                    $('#analyse-btn').prop('disabled', false).css({cursor: 'pointer', opacity: 1});
+                } else {
+                    // No DICOM files found, disable the Analyse button
+                    $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+                }
+            }).fail(function() {
+                // Request failed, disable the Analyse button
+                $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+            });
+        } else {
+            // No subfolder is selected, disable the Analyse button
+            $('#analyse-btn').prop('disabled', true).css({cursor: 'not-allowed', opacity: 0.5});
+        }
+    }
     
 
     // Add the event listener to update the value display on input
@@ -790,7 +805,9 @@ $(document).ready(function() {
 
     $('#subfolder-select').change(function() {
         const selectedSubfolder = $(this).val();
-        loadDicomImagesForSubfolder(selectedSubfolder); // Trigger loading DICOM files for the selected subfolder
+        loadDicomImagesForSubfolder(selectedSubfolder);// Trigger loading DICOM files for the selected subfolder
+        loadSegmentationImagesForSubfolder(selectedSubfolder);
+        checkAndEnableAnalyseButton(selectedSubfolder);
     });
 
     $.getJSON('/subfolders', function(data) {
@@ -814,13 +831,43 @@ $(document).ready(function() {
     
     
     // Event listener for the Analyse button
-    $('#analyse-dicom-btn').click(function() {
-        var selectedSubfolder = $('#dicom-subfolder-select').val();
-        if (selectedSubfolder) {
-            loadDicomImagesForSubfolder(selectedSubfolder); // Only load images when the button is clicked
-        } else {
-            alert("Please select a DICOM subfolder first.");
-        }
+    $('#analyse-btn').click(function() {
+        var selectedSubfolder = $('#subfolder-select').val();
+
+        // Show the loading screen when the analysis starts
+        $('#analyse-screen').show();
+
+        $.ajax({
+            url: '/run-analysis',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({subfolder: selectedSubfolder}),
+            success: function(response) {
+                console.log('Analysis completed: ', response.message);
+                if (response.output) {
+                    console.log('Analysis Output: ', response.output);
+                }
+
+                // Hide the loading screen whether success or failure
+                $('#analyse-screen').hide();
+
+                // After hiding the loading screen, check if a subfolder is selected and load segmentation images
+                if (selectedSubfolder) {
+                    loadSegmentationImagesForSubfolder(selectedSubfolder);
+                } else {
+                    alert("Please select a segmentation subfolder first.");
+                }
+            },
+            error: function(xhr) {
+                console.error('Analysis failed: ', xhr.responseJSON.error);
+
+                // Hide the loading screen on error as well
+                $('#analyse-screen').hide();
+
+                // Optionally, display an alert or another form of error message to the user
+                alert("Analysis failed: " + xhr.responseJSON.error);
+            }
+        });
     });
 
     $('#analyse-segmentation-btn').click(function() {
@@ -834,4 +881,34 @@ $(document).ready(function() {
         }
     });
 
+    // Trigger the loading screen on form submission
+    $('form').submit(function(event) {
+        $('#loading-screen').show();
+    });
+
+    // Assuming you're using AJAX to handle the form submission:
+    $('form').on('submit', function(e) {
+        e.preventDefault();  // Prevent the default form submission
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(data) {
+                console.log('Upload successful');
+                $('#loading-screen').hide();
+                // Handle success
+                location.reload();
+            },
+            error: function(data) {
+                console.error('Upload failed');
+                $('#loading-screen').hide();
+                // Handle error
+                location.reload();
+            }
+        });
+    });
 });

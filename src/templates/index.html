@@ -18,6 +18,22 @@
 
 
 <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <div class="loader"></div>
+            <p style="color: white; text-align: center;">Uploading...</p>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="analyse-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <div class="loader"></div>
+            <p style="color: white; text-align: center;">Analyzing...</p>
+        </div>
+    </div>
+
     <h2 class="header-title">XipeAI | DICOM Viewer</h2>
 
     <hr>
@@ -39,25 +55,7 @@
                     <!-- Options will be dynamically populated here -->
                 </select>
                 <!-- Analyse button -->
-                <button id="analyse-btn">Analyse</button>
-            </div>
-        </div>
-        <div class="upload-section">
-            <div id="segmentation-form-container">
-                <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
-                    <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
-                    <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
-                    <span id="segmentation-name">No file chosen</span>
-                    <input type="submit" value="Upload">
-                </form>
-            </div>
-
-            <div id="segmentation-subfolder-container">
-                <label for="segmentation-subfolder-select">Select Segmentation:</label>
-                <select id="segmentation-subfolder-select">
-                    <!-- Segmentation subfolders will be dynamically populated here -->
-                </select>
-                <button id="analyse-segmentation-btn">Analyse</button>
+                <button id="analyse-btn" disabled style="cursor: not-allowed; opacity: 0.5;">Analyse</button>
             </div>
         </div>
     </div>
