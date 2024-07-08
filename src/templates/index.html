@@ -58,24 +58,6 @@
                 <button id="analyse-btn" disabled style="cursor: not-allowed; opacity: 0.5;">Analyse</button>
             </div>
         </div>
-        <div class="upload-section">
-            <div id="segmentation-form-container">
-                <form action="/uploadsegmented" method="post" enctype="multipart/form-data">
-                    <label for="segmentation-upload" class="custom-file-upload">Choose segmentation</label>
-                    <input id="segmentation-upload" type="file" name="file" accept=".zip" onchange="updateSegmentationName(this)">
-                    <span id="segmentation-name">No file chosen</span>
-                    <input type="submit" value="Upload">
-                </form>
-            </div>
-
-            <div id="segmentation-subfolder-container">
-                <label for="segmentation-subfolder-select">Select Segmentation:</label>
-                <select id="segmentation-subfolder-select">
-                    <!-- Segmentation subfolders will be dynamically populated here -->
-                </select>
-                <button id="analyse-segmentation-btn">Analyse</button>
-            </div>
-        </div>
     </div>
 
     <hr>

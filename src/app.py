@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 # Append the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,7 +34,7 @@ app.config['NIFTI_FOLDER'] = os.path.join(UPLOAD_FOLDER, NIFTI_FOLDER)
 app.config['SEGMENTED_DICOM'] = os.path.join(UPLOAD_FOLDER, SEGMENTED_DICOM)
 secret_key = secrets.token_urlsafe(24)
 app.secret_key = secret_key  
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+ # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Ensure UPLOAD_FOLDER exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -143,11 +144,40 @@ def rename_nifti_files(nifti_subfolder_path):
             break  # Assuming only one NIfTI file is expected per directory
 
 def run_command(command):
+    logging.info(f"Running command: {command}")
+    
+    # Split the command to verify input and output paths
+    command_parts = command.split()
+    input_dir = None
+    output_dir = None
+
+    for i, part in enumerate(command_parts):
+        if part == '-i' and i + 1 < len(command_parts):
+            input_dir = command_parts[i + 1]
+        if part == '-o' and i + 1 < len(command_parts):
+            output_dir = command_parts[i + 1]
+
+    if input_dir and not os.path.exists(input_dir):
+        logging.error(f"Input directory does not exist: {input_dir}")
+        return {"success": False, "error": f"Input directory does not exist: {input_dir}"}
+    
+    if output_dir and not os.path.exists(output_dir):
+        logging.error(f"Output directory does not exist: {output_dir}")
+        return {"success": False, "error": f"Output directory does not exist: {output_dir}"}
+    
     try:
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        return {"success": True, "output": result.stdout}  # Success case
+        logging.info(f"Command succeeded: {command}")
+        logging.debug(f"Command output: {result.stdout}")
+        return {"success": True, "output": result.stdout}
     except subprocess.CalledProcessError as e:
-        return {"success": False, "error": e.stderr}  # Error case
+        logging.error(f"Command failed: {command}")
+        logging.error(f"Return code: {e.returncode}")
+        logging.error(f"Error output: {e.stderr}")
+        return {"success": False, "error": e.stderr}
+    except Exception as e:
+        logging.exception(f"An unexpected error occurred while running the command: {command}")
+        return {"success": False, "error": str(e)}
     
 def get_subfolders(directory, root_dir=None):
     if root_dir is None:
@@ -457,14 +487,14 @@ def run_analysis():
     os.makedirs(segmented_dicom_folder, exist_ok=True)
     
     # Command 1: Predicting with nnUNet
-    predict_command = f'nnUNetv2_predict -d Dataset001_Liver -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
+    predict_command = f'nnUNetv2_predict -d Dataset002_Liver -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
     prediction_result = run_command(predict_command)
     
     if not prediction_result['success']:
         return jsonify({"success": False, "message": "Prediction failed", "error": prediction_result['error']}), 500
 
     # Command 2: Applying postprocessing with nnUNet
-    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "C:/MyPythonProjects/XipeAI/test_data/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "C:/MyPythonProjects/XipeAI/test_data/nnUnet_results/Dataset001_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
+    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "C:/MyPythonProjects/XipeAI/models/nnUnet_results/Dataset002_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "C:/MyPythonProjects/XipeAI/models/nnUnet_results/Dataset002_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
     postprocess_result = run_command(postprocess_command)
     
     if not postprocess_result['success']:
