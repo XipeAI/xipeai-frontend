@@ -467,6 +467,10 @@ def run_analysis():
     # construct input folder
     input_folder = os.path.abspath(app.config['NIFTI_FOLDER'])
     input_folder = os.path.join(input_folder, subfolder)
+
+    # construct extracetd folder
+    extracted_folder = os.path.abspath(app.config['EXTRACTED_FOLDER'])
+    extracted_folder = os.path.join(extracted_folder, subfolder)
     
     # construct output folder
     output_folder = os.path.abspath(app.config['SEGMENTED_FOLDER'])
@@ -504,7 +508,7 @@ def run_analysis():
     nifti_name = find_nii_gz_file(output_pp_folder)
     if nifti_name:
         input_dir = f"{output_pp_folder}/{nifti_name}"
-        utils.nifti2dicom_1file(input_dir, segmented_dicom_folder)
+        utils.nifti2dicom_1file(input_dir, extracted_folder, segmented_dicom_folder)
         
     # Get the list of subfolders
     segmented_dicom_subfolders = get_subfolders(app.config['SEGMENTED_DICOM'])
