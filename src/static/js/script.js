@@ -22,6 +22,29 @@ function applyWindowing() {
         cornerstone.setViewport(element, viewport);
     }
 
+function exportCanvasAsImage(dicomViewerElement, filename) {
+    const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+    if (cornerstoneCanvas) {
+        // Convert the canvas to a Data URL
+        const imageDataUrl = cornerstoneCanvas.toDataURL('image/png');
+
+        // Create a temporary download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = imageDataUrl;
+        downloadLink.download = filename || 'exported-image.png'; // You can specify a default filename
+
+        // Append the link to the body, click it, and then remove it
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+    } else {
+        console.error('DICOM Viewer canvas not found for export.');
+    }
+}
+    
+        
+    
+
 $(document).ready(function() {
     let currentIndex = 0;
     let dicomFiles = [];
@@ -44,6 +67,49 @@ $(document).ready(function() {
             showColoredSegmentation = true;
         }
         updateSegmentationDisplay(); // Update the display
+    });
+
+    function exportCanvasAsDICOM(dicomViewerElement, filename) {
+        const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
+        if (cornerstoneCanvas) {
+            // Convert the canvas to a Data URL
+            const imageDataUrl = cornerstoneCanvas.toDataURL('image/png');
+
+            fetch('/api/save_dicom', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    imageData: imageDataUrl,
+                    filename: filename || 'exported_image'
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = data.path;  // The path to the DICOM file returned by the server
+                downloadLink.download = `${filename || 'exported_image'}.dcm`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            })
+            .catch(error => console.error('Error:', error));
+        } else {
+            console.error('DICOM Viewer canvas not found for export.');
+        }
+    }
+
+    $('#exportButton').click(function() {
+        const dicomViewerElement = '#dicomViewer';  // Replace with actual selector
+        const filename = 'exported_dicom';  // Replace with actual filename or get from user input
+
+        exportCanvasAsDICOM(dicomViewerElement, filename);
     });
 
         function updateSegmentationDisplay() {
@@ -75,6 +141,55 @@ $(document).ready(function() {
             overlaySegmentationOnDicomViewer(element, lastSegmentationCanvas);
         }
     });
+
+    function exportAllImages() {
+        const zip = new JSZip();
+    
+        // Assume a function to asynchronously draw and return a promise that resolves to a canvas
+        function prepareCanvas(imageIndex) {
+            return new Promise((resolve, reject) => {
+                // You should adapt loadAndOverlaySegmentationWithBoundingBoxes to return a promise
+                loadAndOverlaySegmentationWithBoundingBoxes(imageIndex).then(canvas => {
+                    const context = canvas.getContext('2d');
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const radius = 50; // Set the radius size as needed
+
+                    // Draw a red circle in the middle of the canvas
+                    context.beginPath();
+                    context.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
+                    context.fillStyle = 'red';
+                    context.fill();
+                    context.lineWidth = 5;
+                    context.strokeStyle = '#FF0000';
+                    context.stroke();
+
+                    resolve(canvas.toDataURL('image/png'));
+                }).catch(error => {
+                    console.error("Error preparing canvas for image index " + imageIndex + ": ", error);
+                    reject(error);
+                });
+            });
+        }
+    
+        // Process the specific image and add to zip
+        prepareCanvas(currentIndex).then(dataUrl => {
+            zip.file(`Image_${currentIndex + 1}.png`, dataUrl.split('base64,')[1], {base64: true});
+
+            // Generate the ZIP file and trigger the download
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(content);
+                downloadLink.download = 'exported_image.zip'; // Changed to singular since it's only one image
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            });
+        }).catch(error => {
+            alert("An error occurred while preparing the export: " + error);
+            console.error(error);
+        });
+    }
 
 
     function loadDicomImagesForSubfolder(subfolder) {
@@ -368,7 +483,6 @@ $(document).ready(function() {
 
     function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
         console.log("loadAndOverlaySegmentationWithBoundingBoxes called with index: ", imageIndex);
-    // ... rest of the function
         if (segmentationFiles.length > imageIndex) {
             const subfolder = $('#subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
@@ -471,6 +585,8 @@ $(document).ready(function() {
             });
         }
     }
+    
+    
 
     function calculateBoundingBoxes(labels, width, height) {
         let boundingBoxes = [];

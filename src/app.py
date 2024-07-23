@@ -1,5 +1,6 @@
 import sys
 import os
+import io
 import logging
 # Append the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,10 +13,17 @@ import shutil
 from werkzeug.utils import safe_join
 import pydicom
 from pydicom.data import get_testdata_files
+from pydicom.dataset import Dataset, FileMetaDataset
 import secrets
 from urllib.parse import unquote
 import dicom2nifti
 import utils.format_transformation as utils
+from PIL import Image
+import base64
+from datetime import datetime
+import numpy as np
+import SimpleITK as sitk
+import tempfile
 
 
 app = Flask(__name__)
@@ -520,6 +528,70 @@ def run_analysis():
         "prediction_output": prediction_result['output'],
         "postprocessing_output": postprocess_result['output']
     })
+
+def png_to_grayscale_dcm(image_data, filename):
+    # Convert binary data to a PIL image
+    image = Image.open(io.BytesIO(image_data)).convert('L')  # Convert to grayscale
+    pixel_array = np.array(image)
+
+    # Create a new DICOM dataset
+    file_meta = FileMetaDataset()
+    file_meta.MediaStorageSOPClassUID = pydicom.uid.SecondaryCaptureImageStorage
+    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+    file_meta.ImplementationClassUID = pydicom.uid.PYDICOM_IMPLEMENTATION_UID
+
+    # Create the main dataset and set necessary values
+    ds = Dataset()
+    ds.file_meta = file_meta
+    ds.PatientName = "Test^Patient"
+    ds.PatientID = "123456"
+    ds.StudyInstanceUID = pydicom.uid.generate_uid()
+    ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+    ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
+    ds.SOPClassUID = file_meta.MediaStorageSOPClassUID
+    ds.is_little_endian = True
+    ds.is_implicit_VR = True
+
+    # Set creation date and time
+    dt = datetime.now()
+    ds.ContentDate = dt.strftime('%Y%m%d')
+    ds.ContentTime = dt.strftime('%H%M%S.%f')  # Long format with microseconds
+
+    # Set necessary DICOM attributes for image data
+    ds.Modality = 'OT'
+    ds.Rows, ds.Columns = pixel_array.shape
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.BitsAllocated = 8
+    ds.BitsStored = 8
+    ds.HighBit = 7
+    ds.PixelRepresentation = 0
+    ds.PixelData = pixel_array.tobytes()
+
+    # Save DICOM file
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.dcm')
+    ds.save_as(temp_file.name, write_like_original=False)
+
+    return temp_file.name
+
+@app.route('/api/save_dicom', methods=['POST'])
+def save_dicom():
+    try:
+        data = request.get_json()
+        image_data = data['imageData']
+        filename = data['filename']
+
+        # Remove the header from the data URL
+        header, encoded = image_data.split(",", 1)
+        image_data = base64.b64decode(encoded)
+
+        # Convert PNG to grayscale DICOM
+        dicom_path = png_to_grayscale_dcm(image_data, filename)
+
+        return jsonify({"message": "DICOM file saved successfully!", "path": dicom_path})
+    except Exception as e:
+        app.logger.error(f"Error processing request: {e}")
+        return jsonify({"error": str(e)}), 500
     
     
     
