@@ -69,47 +69,65 @@ $(document).ready(function() {
         updateSegmentationDisplay(); // Update the display
     });
 
-    function exportCanvasAsDICOM(dicomViewerElement, filename) {
-        const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
-        if (cornerstoneCanvas) {
-            // Convert the canvas to a Data URL
-            const imageDataUrl = cornerstoneCanvas.toDataURL('image/png');
-
+    function exportCanvasAsDICOM(filename) {
+        const dicomFileName = dicomFiles[currentIndex];
+        const segmentationFileName = segmentationFiles[currentIndex];
+    
+        if (!dicomFileName || !segmentationFileName) {
+            console.error('DICOM or segmentation file is missing.');
+            return;
+        }
+    
+        const subfolder = $('#subfolder-select').val();
+    
+        // Fetch the DICOM and segmentation files as blobs
+        const dicomFileUrl = `/dicom/${subfolder}/${dicomFileName}`;
+        const segmentationFileUrl = `/segmented-dicom/${subfolder}/${segmentationFileName}`;
+    
+        Promise.all([
+            fetch(dicomFileUrl).then(response => response.blob()),
+            fetch(segmentationFileUrl).then(response => response.blob())
+        ]).then(([dicomBlob, segmentationBlob]) => {
+            // Create a FormData object to hold the files
+            const formData = new FormData();
+            formData.append('dicomFile', dicomBlob, dicomFileName);
+            formData.append('segmentationFile', segmentationBlob, segmentationFileName);
+            formData.append('filename', filename || 'exported_image');
+    
+            console.log('FormData contents:');
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ': ', pair[1]);
+            }
+    
             fetch('/api/save_dicom', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    imageData: imageDataUrl,
-                    filename: filename || 'exported_image'
-                })
+                body: formData
             })
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(err => { throw new Error(err.error); });
                 }
-                return response.json();
+                return response.blob();
             })
-            .then(data => {
+            .then(blob => {
                 const downloadLink = document.createElement('a');
-                downloadLink.href = data.path;  // The path to the DICOM file returned by the server
+                const url = window.URL.createObjectURL(blob);
+                downloadLink.href = url;
                 downloadLink.download = `${filename || 'exported_image'}.dcm`;
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
                 document.body.removeChild(downloadLink);
+                window.URL.revokeObjectURL(url);
             })
             .catch(error => console.error('Error:', error));
-        } else {
-            console.error('DICOM Viewer canvas not found for export.');
-        }
+        }).catch(error => console.error('Error fetching DICOM or segmentation files:', error));
     }
-
+    
+    
     $('#exportButton').click(function() {
-        const dicomViewerElement = '#dicomViewer';  // Replace with actual selector
         const filename = 'exported_dicom';  // Replace with actual filename or get from user input
 
-        exportCanvasAsDICOM(dicomViewerElement, filename);
+        exportCanvasAsDICOM(filename);
     });
 
         function updateSegmentationDisplay() {

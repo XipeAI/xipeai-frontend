@@ -2,11 +2,14 @@ import sys
 import os
 import io
 import logging
+from PIL import Image
+from skimage.measure import label, regionprops
+from PIL import Image, ImageDraw
 # Append the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import subprocess
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template, send_file
 from flask_cors import CORS
 import zipfile
 import shutil
@@ -574,24 +577,92 @@ def png_to_grayscale_dcm(image_data, filename):
 
     return temp_file.name
 
+def apply_ct_window(img, window):
+    # window = (window width, window level)
+    R = (img-window[1]+0.5*window[0])/window[0]
+    R[R<0] = 0
+    R[R>1] = 1
+    return R
+
+def get_bounding_boxes(mask, label_value):
+    labeled_mask = label(mask == label_value)
+    regions = regionprops(labeled_mask)
+    boxes = []
+    for region in regions:
+        min_row, min_col, max_row, max_col = region.bbox
+        boxes.append((min_row, min_col, max_row, max_col))
+    return boxes
+
+def draw_bounding_boxes(image, boxes, margin=5, thickness=4):
+    img_bbox = Image.fromarray((255 * image).astype('uint8')).convert('RGB')
+    draw = ImageDraw.Draw(img_bbox)
+    for box in boxes:
+        top, left, bottom, right = box
+        top = max(0, top - margin)
+        left = max(0, left - margin)
+        bottom = min(image.shape[0], bottom + margin)
+        right = min(image.shape[1], right + margin)
+        for i in range(thickness):
+            draw.rectangle(
+                [left + i, top + i, right - i, bottom - i],
+                outline=(255, 0, 0)
+            )
+    del draw
+    return np.asarray(img_bbox)
+
+def create_dicom_with_bboxes(dicom_file, segmentation_file, filename):
+    # Decode the DICOM file data
+    ds = pydicom.dcmread(io.BytesIO(dicom_file.read()))
+    img = ds.pixel_array.astype(float)
+    img = img * ds.RescaleSlope + ds.RescaleIntercept
+
+    # Apply the CT window
+    display_img = apply_ct_window(img, [400, 50])
+
+    # Decode the segmentation file data
+    seg_ds = pydicom.dcmread(io.BytesIO(segmentation_file.read()))
+    mask = seg_ds.pixel_array
+
+    # Get bounding boxes for regions labeled as 2
+    boxes = get_bounding_boxes(mask, 2)
+
+    # Draw bounding boxes on the image
+    img_bbox = draw_bounding_boxes(display_img, boxes)
+
+    # Modify DICOM tags
+    ds.PhotometricInterpretation = 'RGB'
+    ds.SamplesPerPixel = 3
+    ds.BitsAllocated = 8
+    ds.BitsStored = 8
+    ds.HighBit = 7
+    ds.add_new(0x00280006, 'US', 0)
+    ds.is_little_endian = True
+    ds.fix_meta_info()
+
+    # Save pixel data and DICOM file to an in-memory byte stream
+    ds.PixelData = img_bbox.tobytes()
+    dicom_bytes = io.BytesIO()
+    ds.save_as(dicom_bytes)
+    dicom_bytes.seek(0)
+    
+    return dicom_bytes
+
 @app.route('/api/save_dicom', methods=['POST'])
 def save_dicom():
+    if 'dicomFile' not in request.files or 'segmentationFile' not in request.files:
+        return jsonify({'error': 'Missing file(s)'}), 400
+
+    dicom_file = request.files['dicomFile']
+    segmentation_file = request.files['segmentationFile']
+    filename = request.form.get('filename', 'exported_image')
+
     try:
-        data = request.get_json()
-        image_data = data['imageData']
-        filename = data['filename']
-
-        # Remove the header from the data URL
-        header, encoded = image_data.split(",", 1)
-        image_data = base64.b64decode(encoded)
-
-        # Convert PNG to grayscale DICOM
-        dicom_path = png_to_grayscale_dcm(image_data, filename)
-
-        return jsonify({"message": "DICOM file saved successfully!", "path": dicom_path})
+        dicom_bytes = create_dicom_with_bboxes(dicom_file, segmentation_file, filename)
+        return send_file(dicom_bytes, mimetype='application/dicom', as_attachment=True, download_name=f'{filename}.dcm')
     except Exception as e:
-        app.logger.error(f"Error processing request: {e}")
-        return jsonify({"error": str(e)}), 500
+        print("Exception:", str(e))  # Debugging statement
+        return jsonify({'error': str(e)}), 500
+
     
     
     

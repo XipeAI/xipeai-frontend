@@ -194,16 +194,26 @@ def calculate_tumor_properties(img, voxel_dims):
     return tumor_info
 
 def create_dicom_with_table(tumor_data):
-    # Define image size and create a blank image with white background
-    width, height = 800, 50 + len(tumor_data) * 30
-    image = Image.new('RGB', (width, height), 'white')
+    # Define image size and create a blank image with black background
+    width, height = 800, 80 + len(tumor_data) * 30
+    image = Image.new('RGB', (width, height), 'black')
     draw = ImageDraw.Draw(image)
 
     # Define table properties
+    heading = "Lesion Summary"
     cols = ["Tumor ID", "Width (mm)", "Height (mm)", "Length (mm)", "Volume (cubic mm)"]
     row_height = 30
     col_width = width // len(cols)
     font = ImageFont.load_default()
+
+    # Draw heading
+    heading_bbox = draw.textbbox((0, 0), heading, font=font)
+    heading_width = heading_bbox[2] - heading_bbox[0]
+    heading_height = heading_bbox[3] - heading_bbox[1]
+    heading_x = (width - heading_width) // 2
+    heading_y = 10
+    draw.text((heading_x, heading_y), heading, fill='white', font=font)
+    draw.line([(0, 40), (width, 40)], fill='white', width=2)
 
     # Draw table headers
     for i, col_name in enumerate(cols):
@@ -211,11 +221,11 @@ def create_dicom_with_table(tumor_data):
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         text_x = i * col_width + (col_width - text_width) // 2
-        text_y = 10
-        draw.text((text_x, text_y), col_name, fill='black', font=font)
-        draw.line([(i * col_width, 0), (i * col_width, height)], fill='black', width=2)
+        text_y = 50
+        draw.text((text_x, text_y), col_name, fill='white', font=font)
+        draw.line([(i * col_width, 40), (i * col_width, height)], fill='white', width=2)
     
-    draw.line([(0, row_height), (width, row_height)], fill='black', width=2)
+    draw.line([(0, 70), (width, 70)], fill='white', width=2)
 
     # Fill table cells with tumor data
     for row, data in enumerate(tumor_data):
@@ -225,13 +235,13 @@ def create_dicom_with_table(tumor_data):
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
             text_x = col * col_width + (col_width - text_width) // 2
-            text_y = (row + 1) * row_height + (row_height - text_height) // 2
-            draw.text((text_x, text_y), text, fill='black', font=font)
-        draw.line([(0, (row + 2) * row_height), (width, (row + 2) * row_height)], fill='black', width=2)
+            text_y = (row + 2) * row_height + (row_height - text_height) // 2
+            draw.text((text_x, text_y), text, fill='white', font=font)
+        draw.line([(0, (row + 3) * row_height + 10), (width, (row + 3) * row_height + 10)], fill='white', width=2)
 
     # Draw vertical lines for the last column
-    draw.line([(width - col_width, 0), (width - col_width, height)], fill='black', width=2)
-    draw.line([(width - 1, 0), (width - 1, height)], fill='black', width=2)
+    draw.line([(width - col_width, 40), (width - col_width, height)], fill='white', width=2)
+    draw.line([(width - 1, 40), (width - 1, height)], fill='white', width=2)
 
     # Convert the image to grayscale and numpy array
     image = image.convert('L')
