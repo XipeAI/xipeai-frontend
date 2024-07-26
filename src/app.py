@@ -1,6 +1,7 @@
 import sys
 import os
 import io
+from io import BytesIO
 import logging
 from PIL import Image
 from skimage.measure import label, regionprops
@@ -27,6 +28,7 @@ from datetime import datetime
 import numpy as np
 import SimpleITK as sitk
 import tempfile
+from zipfile import ZipFile
 
 
 app = Flask(__name__)
@@ -577,12 +579,14 @@ def png_to_grayscale_dcm(image_data, filename):
 
     return temp_file.name
 
-def apply_ct_window(img, window):
-    # window = (window width, window level)
-    R = (img-window[1]+0.5*window[0])/window[0]
-    R[R<0] = 0
-    R[R>1] = 1
+def apply_ct_window(img, window_width, window_level):
+    # Calculate the rescaled image based on the provided window width and window level
+    R = (img - window_level + 0.5 * window_width) / window_width
+    # Clamp values to the range [0, 1]
+    R[R < 0] = 0
+    R[R > 1] = 1
     return R
+
 
 def get_bounding_boxes(mask, label_value):
     labeled_mask = label(mask == label_value)
@@ -593,7 +597,7 @@ def get_bounding_boxes(mask, label_value):
         boxes.append((min_row, min_col, max_row, max_col))
     return boxes
 
-def draw_bounding_boxes(image, boxes, margin=5, thickness=4):
+def draw_bounding_boxes(image, boxes, margin=5, thickness=2):
     img_bbox = Image.fromarray((255 * image).astype('uint8')).convert('RGB')
     draw = ImageDraw.Draw(img_bbox)
     for box in boxes:
@@ -610,14 +614,14 @@ def draw_bounding_boxes(image, boxes, margin=5, thickness=4):
     del draw
     return np.asarray(img_bbox)
 
-def create_dicom_with_bboxes(dicom_file, segmentation_file, filename):
+def create_dicom_with_bboxes(dicom_file, segmentation_file, filename, window_width, window_level):
     # Decode the DICOM file data
     ds = pydicom.dcmread(io.BytesIO(dicom_file.read()))
     img = ds.pixel_array.astype(float)
     img = img * ds.RescaleSlope + ds.RescaleIntercept
 
     # Apply the CT window
-    display_img = apply_ct_window(img, [400, 50])
+    display_img = apply_ct_window(img, window_width, window_level)
 
     # Decode the segmentation file data
     seg_ds = pydicom.dcmread(io.BytesIO(segmentation_file.read()))
@@ -647,18 +651,39 @@ def create_dicom_with_bboxes(dicom_file, segmentation_file, filename):
     
     return dicom_bytes
 
-@app.route('/api/save_dicom', methods=['POST'])
-def save_dicom():
-    if 'dicomFile' not in request.files or 'segmentationFile' not in request.files:
-        return jsonify({'error': 'Missing file(s)'}), 400
+@app.route('/api/save_dicom_series', methods=['POST'])
+def save_dicom_series():
+    # Extract multiple files for dicoms and segmentations
+    dicom_files = request.files.getlist('dicomFiles')
+    segmentation_files = request.files.getlist('segmentationFiles')
 
-    dicom_file = request.files['dicomFile']
-    segmentation_file = request.files['segmentationFile']
-    filename = request.form.get('filename', 'exported_image')
+    # Check if any required files are missing
+    if not dicom_files or not segmentation_files:
+        return jsonify({'error': 'Missing DICOM or segmentation files'}), 400
+
+    # Extract additional parameters from the request
+    filename = request.form.get('filename', 'exported_series')
+    window_width = float(request.form.get('windowWidth', 150))
+    window_level = float(request.form.get('windowLevel', 60))
+
+    # Memory buffer for our ZIP file
+    in_memory = BytesIO()
 
     try:
-        dicom_bytes = create_dicom_with_bboxes(dicom_file, segmentation_file, filename)
-        return send_file(dicom_bytes, mimetype='application/dicom', as_attachment=True, download_name=f'{filename}.dcm')
+        with ZipFile(in_memory, mode='w') as zf:
+            # Process each DICOM and segmentation pair
+            for dicom_file, segmentation_file in zip(dicom_files, segmentation_files):
+                processed_data = create_dicom_with_bboxes(dicom_file, segmentation_file, filename, window_width, window_level)
+                zf.writestr(f"{filename}_{dicom_file.filename}", processed_data.getvalue())
+
+        # Prepare the zip file to send
+        in_memory.seek(0)
+        return send_file(
+            in_memory,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{filename}.zip',
+        )
     except Exception as e:
         print("Exception:", str(e))  # Debugging statement
         return jsonify({'error': str(e)}), 500

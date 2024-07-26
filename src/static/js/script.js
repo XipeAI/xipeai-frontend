@@ -84,15 +84,21 @@ $(document).ready(function() {
         const dicomFileUrl = `/dicom/${subfolder}/${dicomFileName}`;
         const segmentationFileUrl = `/segmented-dicom/${subfolder}/${segmentationFileName}`;
     
+        // Retrieve the window width and window level from the input sliders
+        const windowWidth = parseInt(document.getElementById('window-width').value, 10);
+        const windowLevel = parseInt(document.getElementById('window-level').value, 10);
+    
         Promise.all([
             fetch(dicomFileUrl).then(response => response.blob()),
             fetch(segmentationFileUrl).then(response => response.blob())
         ]).then(([dicomBlob, segmentationBlob]) => {
-            // Create a FormData object to hold the files
+            // Create a FormData object to hold the files and additional data
             const formData = new FormData();
             formData.append('dicomFile', dicomBlob, dicomFileName);
             formData.append('segmentationFile', segmentationBlob, segmentationFileName);
             formData.append('filename', filename || 'exported_image');
+            formData.append('windowWidth', windowWidth);
+            formData.append('windowLevel', windowLevel);
     
             console.log('FormData contents:');
             for (let pair of formData.entries()) {
@@ -122,12 +128,77 @@ $(document).ready(function() {
             .catch(error => console.error('Error:', error));
         }).catch(error => console.error('Error fetching DICOM or segmentation files:', error));
     }
+
+    function exportAllDICOMs() {
+        const subfolder = $('#subfolder-select').val();
+    
+        // Create a FormData object to hold all the DICOM and segmentation files
+        const formData = new FormData();
+    
+        // Append filename and window settings once since they are common for all files
+        formData.append('filename', subfolder || 'exported_series');
+        const windowWidth = parseInt(document.getElementById('window-width').value, 10);
+        const windowLevel = parseInt(document.getElementById('window-level').value, 10);
+        formData.append('windowWidth', windowWidth);
+        formData.append('windowLevel', windowLevel);
+    
+        const fileFetchPromises = [];
+    
+        // Loop through all DICOM files and corresponding segmentation files
+        for (let i = 0; i < dicomFiles.length; i++) {
+            const dicomFileName = dicomFiles[i];
+            const segmentationFileName = segmentationFiles[i];
+            const dicomFileUrl = `/dicom/${subfolder}/${dicomFileName}`;
+            const segmentationFileUrl = `/segmented-dicom/${subfolder}/${segmentationFileName}`;
+    
+            // Fetch each file and append to formData
+            fileFetchPromises.push(
+                fetch(dicomFileUrl).then(response => response.blob()).then(blob => {
+                    formData.append('dicomFiles', blob, dicomFileName);
+                })
+            );
+    
+            fileFetchPromises.push(
+                fetch(segmentationFileUrl).then(response => response.blob()).then(blob => {
+                    formData.append('segmentationFiles', blob, segmentationFileName);
+                })
+            );
+        }
+    
+        // Wait for all files to be fetched and appended
+        Promise.all(fileFetchPromises).then(() => {
+            // Send the FormData with all files to the server
+            fetch('/api/save_dicom_series', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error); });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = url;
+                downloadLink.download = `${subfolder || 'exported_series'}.zip`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    }
+    
     
     
     $('#exportButton').click(function() {
-        const filename = 'exported_dicom';  // Replace with actual filename or get from user input
+        // const filename = 'exported_dicom';  // Replace with actual filename or get from user input
 
-        exportCanvasAsDICOM(filename);
+        // exportCanvasAsDICOM(filename);
+        exportAllDICOMs();
     });
 
         function updateSegmentationDisplay() {
