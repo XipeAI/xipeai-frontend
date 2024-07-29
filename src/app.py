@@ -29,6 +29,7 @@ import numpy as np
 import SimpleITK as sitk
 import tempfile
 from zipfile import ZipFile
+from utils.format_transformation import get_dicom_voxel_dims, calculate_tumor_properties
 
 
 app = Flask(__name__)
@@ -651,6 +652,16 @@ def create_dicom_with_bboxes(dicom_file, segmentation_file, filename, window_wid
     
     return dicom_bytes
 
+def get_summary(filename):
+    file_path = os.path.join(app.config["EXTRACTED_FOLDER"], filename)
+    
+    for file_name in os.listdir(file_path):
+        if "_summary" in file_name and file_name.endswith(".dcm"):
+            full_path = os.path.join(file_path, file_name)
+            # Assuming the file is already a binary DICOM file
+            with open(full_path, 'rb') as file:
+                return BytesIO(file.read())
+
 @app.route('/api/save_dicom_series', methods=['POST'])
 def save_dicom_series():
     # Extract multiple files for dicoms and segmentations
@@ -676,6 +687,10 @@ def save_dicom_series():
                 processed_data = create_dicom_with_bboxes(dicom_file, segmentation_file, filename, window_width, window_level)
                 zf.writestr(f"{filename}_{dicom_file.filename}", processed_data.getvalue())
 
+            # Add an summary DICOM file
+            summary = get_summary(filename)
+            zf.writestr(f"{filename}_summary.dcm", summary.getvalue())
+
         # Prepare the zip file to send
         in_memory.seek(0)
         return send_file(
@@ -687,11 +702,34 @@ def save_dicom_series():
     except Exception as e:
         print("Exception:", str(e))  # Debugging statement
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/tumors/<path:subfolder>', methods=['GET'])
+def get_tumors(subfolder):
+    dicom_folder = os.path.join(app.config["EXTRACTED_FOLDER"], subfolder)
+    nifti_predicted_folder = os.path.join(app.config["SEGMENTED_PP_FOLDER"], subfolder)
 
-    
-    
-    
-    
+    voxel_dims = get_dicom_voxel_dims(dicom_folder)
+
+    # Read the NIfTI file
+    if os.path.exists(nifti_predicted_folder):
+        for file in os.listdir(nifti_predicted_folder):
+            if file.endswith('.nii') or file.endswith('.nii.gz'):
+                file_path = os.path.join(nifti_predicted_folder, file)
+
+            new_img = sitk.ReadImage(file_path)
+
+            # Convert the image to an integer type if necessary
+            if new_img.GetPixelID() in [sitk.sitkFloat32, sitk.sitkFloat64]:
+                new_img = sitk.Cast(new_img, sitk.sitkInt16)
+
+            tumor_properties = calculate_tumor_properties(new_img, voxel_dims)
+
+            print(tumor_properties)
+
+            return jsonify(tumor_properties)
+
+    return []
+
     
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5001)

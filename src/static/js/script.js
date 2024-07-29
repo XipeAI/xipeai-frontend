@@ -145,7 +145,7 @@ $(document).ready(function() {
         const fileFetchPromises = [];
     
         // Loop through all DICOM files and corresponding segmentation files
-        for (let i = 0; i < dicomFiles.length; i++) {
+        for (let i = 0; i < (dicomFiles.length - 1); i++) {
             const dicomFileName = dicomFiles[i];
             const segmentationFileName = segmentationFiles[i];
             const dicomFileUrl = `/dicom/${subfolder}/${dicomFileName}`;
@@ -665,7 +665,7 @@ $(document).ready(function() {
 
                     // Delay the table update to ensure canvas updates have completed
                     setTimeout(function() {
-                        updateTumorTable(dimensions, volumes, imageIndex);
+                        // updateTumorTable(dimensions, volumes, imageIndex);
                     }, 0); // Timeout with 0 delay allows for the rest of the UI to update
 
                 });
@@ -1013,7 +1013,30 @@ $(document).ready(function() {
         loadDicomImagesForSubfolder(selectedSubfolder);// Trigger loading DICOM files for the selected subfolder
         loadSegmentationImagesForSubfolder(selectedSubfolder);
         checkAndEnableAnalyseButton(selectedSubfolder);
+        createTumorTable(selectedSubfolder);
     });
+
+    function createTumorTable(selectedSubfolder) {
+        console.log('we are in tumor-table')
+        fetch(`/api/tumors/${selectedSubfolder}`)
+            .then(response => response.json())
+            .then(data => {
+                const table = document.getElementById('tumor-table');
+                const tbody = table.getElementsByTagName('tbody')[0] || table.appendChild(document.createElement('tbody'));
+                tbody.innerHTML = ''; // Clear previous entries
+    
+                // Insert new data
+                data.forEach(tumor => {
+                    let row = tbody.insertRow();
+                    row.insertCell(0).innerHTML = tumor['Tumor ID'];
+                    row.insertCell(1).innerHTML = tumor['Width (mm)'];
+                    row.insertCell(2).innerHTML = tumor['Height (mm)'];
+                    row.insertCell(3).innerHTML = tumor['Length (mm)'];
+                    row.insertCell(4).innerHTML = tumor['Volume (cubic mm)'];
+                });
+            })
+            .catch(error => console.error('Error:', error));
+    }
 
     $.getJSON('/subfolders', function(data) {
         const dicomSubfolderSelect = document.getElementById('subfolder-select');
