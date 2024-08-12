@@ -218,7 +218,7 @@ input[type="submit"]:hover {
 
 }
 
-#subfolder-select, #analyse-btn {
+#subfolder-select, #analyse-btn, #exportButton {
     padding: 10px;
     margin-left: 20px;
     margin-top: 10px;
@@ -244,6 +244,17 @@ input[type="submit"]:hover {
 }
 
 #analyse-btn:hover {
+    background-color: #006050; /* Darker shade on hover for the button */
+}
+
+#exportButton {
+    background-color: #009879; /* Match the primary color theme for the button */
+    color: #ffffff; /* White text for the button */
+    font-weight: bold; /* Make button text bold */
+    transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+}
+
+#exportButton:hover {
     background-color: #006050; /* Darker shade on hover for the button */
 }
 

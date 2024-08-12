@@ -571,15 +571,17 @@ $(document).ready(function() {
     }
 
     function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
-        console.log("loadAndOverlaySegmentationWithBoundingBoxes called with index: ", imageIndex);
         if (segmentationFiles.length > imageIndex) {
             const subfolder = $('#subfolder-select').val();
             const filename = segmentationFiles[imageIndex];
+            // Check if '_summary' is in the filename
+            if (filename.includes('_summary')) {
+                console.log("Skipping file as it contains '_summary': ", filename);
+                return; // Skip this file
+            }
             const segmentationImageId = `wadouri:http://127.0.0.1:5001/segmented-dicom/${subfolder}/${filename}`;
             cornerstone.loadImage(segmentationImageId).then(function(segmentationImage) {
-                console.log("Segmentation image loaded: ", segmentationImage);
                 const pixelData = segmentationImage.getPixelData();
-                console.log("Pixel data: ", pixelData);
                 const { width, height } = segmentationImage;
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
@@ -587,93 +589,35 @@ $(document).ready(function() {
                 const context = canvas.getContext('2d');
     
                 const labels = labelConnectedComponents(pixelData, width, height);
-                console.log("Labels: ", labels);
                 const boundingBoxes = calculateBoundingBoxes(labels, width, height);
-                console.log("Bounding Boxes: ", boundingBoxes);
                 const mergedBoxes = updateBoundingBoxesWithMerging(boundingBoxes);
-
-                const { pixelSpacing} = getPixelSpacingAndSliceThickness(segmentationImage);
-                const sliceThickness = 5;
-                console.log("Pixel Spacing: ", pixelSpacing, "Slice Thickness: ", sliceThickness);
-
-                const { dimensions, volumes } = calculateRealWorldMeasurements(mergedBoxes, pixelSpacing, sliceThickness);
-                
-
-                //updateTumorTable(dimensions, volumes, currentSliceIndex);
-                console.log('Tumor Dimensions:', dimensions);
-                console.log('Tumor Volumes:', volumes);
-                
-                calculateDensity(imageIndex, pixelData, dimensions, volumes)
-                .then(function(densities) {
-                    // Define margin size (e.g., 5 pixels)
-                    const margin = 5;
-        
-                    // Draw bounding boxes
-                    context.strokeStyle = 'red';
-                    context.lineWidth = 2;
-                    console.log('Volumes array:', volumes);
-                    console.log('Density array:', densities);
-
-                    const labelBoxes = [];
-
-                    mergedBoxes.forEach((box, index) => {
-                        if (box) {
-                            //const densityText = densities[index] !== undefined ? `Density: ${densities[index].toFixed(2)}` : 'Density: N/A';
-                            const density = densities[index];
-                            if (density === undefined) {
-                                console.error(`Density for lesion ${index + 1} is undefined.`);
-                            }
-                            const densityText = density !== undefined ? `Density: ${density.toFixed(2)}` : 'Density: N/A';
-                            const volumeIndex = index;
-                            const volume = volumes[volumeIndex];
-                            const volumeText = volume !== undefined ? `Volume: ${volume.toFixed(2)} mm³` : 'Volume: N/A';
-                            const lesionLabel = `Lesion ${index + 1}`; // Assuming you want 1-based indexing for display
-                            // const volumeIndex = index - 1;
-                            // const volume = volumes[volumeIndex];
-                            // const volumeText = volume !== undefined ? volume.toFixed(2) + ' mm³' : 'N/A';
-                            // const label = `Lesion ${index} ${volumeText}`;
-                            context.strokeRect(
-                                Math.max(box.minX - margin, 0),
-                                Math.max(box.minY - margin, 0),
-                                Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)),
-                                Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin))
-                            );
-
-                            const labelX = box.maxX + 10;
-                            const labelY = box.minY;
-                            const labelWidth = 135;  // Adjust width as needed
-                            const labelHeight = 60;  // Adjust height as needed
-
-                            let labelBox = {
-                                minX: labelX,
-                                minY: labelY,
-                                maxX: labelX + labelWidth,
-                                maxY: labelY + labelHeight
-                            };
-
-                            labelBox = adjustLabelPosition(labelBoxes, labelBox);
-
-                            // Draw the label
-                            drawBoundingBoxWithLabel(context, box, lesionLabel, volumeText, densityText, labelBox.minX, labelBox.minY);
-
-                            labelBoxes.push(labelBox);
-                        }
-                    });
-        
-                    lastSegmentationCanvas = canvas;
-                    overlaySegmentationOnDicomViewer(element, canvas);
-
-                    // Delay the table update to ensure canvas updates have completed
-                    setTimeout(function() {
-                        // updateTumorTable(dimensions, volumes, imageIndex);
-                    }, 0); // Timeout with 0 delay allows for the rest of the UI to update
-
+    
+                // Define margin size (e.g., 5 pixels)
+                const margin = 5;
+    
+                // Draw bounding boxes with margin
+                context.strokeStyle = 'red';
+                context.lineWidth = 2;
+                mergedBoxes.forEach((box) => {
+                    if (box) {
+                        context.strokeRect(
+                            Math.max(box.minX - margin, 0),
+                            Math.max(box.minY - margin, 0),
+                            Math.min(box.maxX - box.minX + 1 + 2 * margin, width - (box.minX - margin)),
+                            Math.min(box.maxY - box.minY + 1 + 2 * margin, height - (box.minY - margin))
+                        );
+                    }
                 });
+    
+                lastSegmentationCanvas = canvas;
+                overlaySegmentationOnDicomViewer(element, canvas);
+    
             }).catch(function(error) {
                 console.error('Error loading segmentation image:', error);
             });
         }
     }
+    
     
     
 
