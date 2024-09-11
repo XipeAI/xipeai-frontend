@@ -42,8 +42,6 @@ function exportCanvasAsImage(dicomViewerElement, filename) {
     }
 }
     
-        
-    
 
 $(document).ready(function() {
     let currentIndex = 0;
@@ -68,66 +66,6 @@ $(document).ready(function() {
         }
         updateSegmentationDisplay(); // Update the display
     });
-
-    function exportCanvasAsDICOM(filename) {
-        const dicomFileName = dicomFiles[currentIndex];
-        const segmentationFileName = segmentationFiles[currentIndex];
-    
-        if (!dicomFileName || !segmentationFileName) {
-            console.error('DICOM or segmentation file is missing.');
-            return;
-        }
-    
-        const subfolder = $('#subfolder-select').val();
-    
-        // Fetch the DICOM and segmentation files as blobs
-        const dicomFileUrl = `/dicom/${subfolder}/${dicomFileName}`;
-        const segmentationFileUrl = `/segmented-dicom/${subfolder}/${segmentationFileName}`;
-    
-        // Retrieve the window width and window level from the input sliders
-        const windowWidth = parseInt(document.getElementById('window-width').value, 10);
-        const windowLevel = parseInt(document.getElementById('window-level').value, 10);
-    
-        Promise.all([
-            fetch(dicomFileUrl).then(response => response.blob()),
-            fetch(segmentationFileUrl).then(response => response.blob())
-        ]).then(([dicomBlob, segmentationBlob]) => {
-            // Create a FormData object to hold the files and additional data
-            const formData = new FormData();
-            formData.append('dicomFile', dicomBlob, dicomFileName);
-            formData.append('segmentationFile', segmentationBlob, segmentationFileName);
-            formData.append('filename', filename || 'exported_image');
-            formData.append('windowWidth', windowWidth);
-            formData.append('windowLevel', windowLevel);
-    
-            console.log('FormData contents:');
-            for (let pair of formData.entries()) {
-                console.log(pair[0] + ': ', pair[1]);
-            }
-    
-            fetch('/api/save_dicom', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => { throw new Error(err.error); });
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                const downloadLink = document.createElement('a');
-                const url = window.URL.createObjectURL(blob);
-                downloadLink.href = url;
-                downloadLink.download = `${filename || 'exported_image'}.dcm`;
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => console.error('Error:', error));
-        }).catch(error => console.error('Error fetching DICOM or segmentation files:', error));
-    }
 
     function exportAllDICOMs() {
         const subfolder = $('#subfolder-select').val();
@@ -195,9 +133,6 @@ $(document).ready(function() {
     
     
     $('#exportButton').click(function() {
-        // const filename = 'exported_dicom';  // Replace with actual filename or get from user input
-
-        // exportCanvasAsDICOM(filename);
         exportAllDICOMs();
     });
 
@@ -230,55 +165,6 @@ $(document).ready(function() {
             overlaySegmentationOnDicomViewer(element, lastSegmentationCanvas);
         }
     });
-
-    function exportAllImages() {
-        const zip = new JSZip();
-    
-        // Assume a function to asynchronously draw and return a promise that resolves to a canvas
-        function prepareCanvas(imageIndex) {
-            return new Promise((resolve, reject) => {
-                // You should adapt loadAndOverlaySegmentationWithBoundingBoxes to return a promise
-                loadAndOverlaySegmentationWithBoundingBoxes(imageIndex).then(canvas => {
-                    const context = canvas.getContext('2d');
-                    const centerX = canvas.width / 2;
-                    const centerY = canvas.height / 2;
-                    const radius = 50; // Set the radius size as needed
-
-                    // Draw a red circle in the middle of the canvas
-                    context.beginPath();
-                    context.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
-                    context.fillStyle = 'red';
-                    context.fill();
-                    context.lineWidth = 5;
-                    context.strokeStyle = '#FF0000';
-                    context.stroke();
-
-                    resolve(canvas.toDataURL('image/png'));
-                }).catch(error => {
-                    console.error("Error preparing canvas for image index " + imageIndex + ": ", error);
-                    reject(error);
-                });
-            });
-        }
-    
-        // Process the specific image and add to zip
-        prepareCanvas(currentIndex).then(dataUrl => {
-            zip.file(`Image_${currentIndex + 1}.png`, dataUrl.split('base64,')[1], {base64: true});
-
-            // Generate the ZIP file and trigger the download
-            zip.generateAsync({ type: "blob" }).then(function(content) {
-                const downloadLink = document.createElement('a');
-                downloadLink.href = URL.createObjectURL(content);
-                downloadLink.download = 'exported_image.zip'; // Changed to singular since it's only one image
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-            });
-        }).catch(error => {
-            alert("An error occurred while preparing the export: " + error);
-            console.error(error);
-        });
-    }
 
 
     function loadDicomImagesForSubfolder(subfolder) {
@@ -425,66 +311,6 @@ $(document).ready(function() {
 
         return labels;
     }
-
-    function calculateRealWorldMeasurements(boundingBoxes, pixelSpacing, sliceThickness) {
-        let volumes = [];
-        let dimensions = [];
-    
-        boundingBoxes.forEach(box => {
-            if (box) {
-                // Real-world dimensions
-                let width = (box.maxX - box.minX + 1) * pixelSpacing[0];
-                let height = (box.maxY - box.minY + 1) * pixelSpacing[1];
-                let depth = sliceThickness; // Considering the depth is the slice thickness for single slice
-    
-                dimensions.push({ width, height, depth });
-    
-                // Volume calculation - assuming the bounding box represents a rectangular prism
-                let volume = width * height * depth;
-                volumes.push(volume);
-            }
-        });
-    
-        return { dimensions, volumes };
-    }
-
-    function calculateDensity(imageIndex, pixelData, dimensions, volumes) {
-        const subfolder = $('#subfolder-select').val();
-        const filename = dicomFiles[imageIndex];
-        const dicomImageId = `wadouri:http://127.0.0.1:5000/dicom/${subfolder}/${filename}`;
-        
-        return cornerstone.loadImage(dicomImageId).then(function(dicomImage) {
-            const dicomPixelData = dicomImage.getPixelData();
-            const labels = labelConnectedComponents(pixelData, dicomImage.width, dicomImage.height);
-            const densitySums = {};
-            const densityCounts = {};
-            const densities = [];
-    
-            // Loop through all labeled pixels to sum and count densities
-            for (let label = 1; label <= volumes.length; label++) {
-                const maskIndices = labels.reduce((indices, currentLabel, index) => {
-                    if (currentLabel === label) {
-                        indices.push(index);
-                    }
-                    return indices;
-                }, []);
-    
-                // Here, calculate the average density based on the mask indices
-                // You need to ensure the correct pixels are used in your calculation
-                const lesionDensity = maskIndices.reduce((sum, index) => {
-                    return sum + dicomPixelData[index]; // This assumes that higher pixel values indicate higher density
-                }, 0) / maskIndices.length;
-    
-                densities.push(lesionDensity);
-            }
-    
-            // Return the array of densities
-            return densities;
-        }).catch(function(error) {
-            console.error('Error loading DICOM image:', error);
-            return []; // Return an empty array in case of an error
-        });
-    }
     
 
     //andra boxing
@@ -529,45 +355,6 @@ $(document).ready(function() {
         mergedBoxes.forEach(box => boundingBoxes.push(box));
 
         return mergedBoxes;
-    }
-
-    //end
-    
-    // Function to retrieve pixel spacing and slice thickness from DICOM metadata
-    function getPixelSpacingAndSliceThickness(segmentationImage) {
-        const pixelSpacingString = segmentationImage.data.string('x00280030'); // Pixel spacing DICOM tag
-        const sliceThicknessString = segmentationImage.data.string('x00180050'); // Slice thickness DICOM tag
-    
-        let pixelSpacing = pixelSpacingString ? pixelSpacingString.split('\\').map(Number) : [1, 1]; // Default to 1 if not specified
-        let sliceThickness = sliceThicknessString ? parseFloat(sliceThicknessString) : 1; // Default to 1 if not specified
-    
-        return { pixelSpacing, sliceThickness };
-    }
-
-    function adjustLabelPosition(labelBoxes, newLabelBox) {
-        // Initial offset for the label in case of overlap
-        const offsetIncrement = 10;
-        let offset = 0;
-      
-        while (checkForOverlap(newLabelBox, labelBoxes)) {
-            offset += offsetIncrement;
-            newLabelBox.minY += offset; // Move the label down by the offset
-            newLabelBox.maxY += offset;
-        }
-    
-        // Return the adjusted label box
-        return newLabelBox;
-    }
-    
-    function checkForOverlap(newLabelBox, labelBoxes) {
-        return labelBoxes.some(existingBox => {
-            return (
-                newLabelBox.minX < existingBox.maxX &&
-                newLabelBox.maxX > existingBox.minX &&
-                newLabelBox.minY < existingBox.maxY &&
-                newLabelBox.maxY > existingBox.minY
-            );
-        });
     }
 
     function loadAndOverlaySegmentationWithBoundingBoxes(imageIndex) {
@@ -618,8 +405,6 @@ $(document).ready(function() {
         }
     }
     
-    
-    
 
     function calculateBoundingBoxes(labels, width, height) {
         let boundingBoxes = [];
@@ -642,86 +427,6 @@ $(document).ready(function() {
         }
         return boundingBoxes;
     }
-
-    function drawBoundingBoxWithLabel(context, box, lesionLabel, volumeText, densityText, labelX, labelY) {
-        // Set styles for the bounding box
-        context.strokeStyle = 'red';
-        context.lineWidth = 2;
-    
-        // Calculate text width and height for background sizing
-        const textBackgroundWidth = 135;
-        const textBackgroundHeight = 55;
-
-        const lineHeight = parseInt(context.font, 14); // Extract the font size from the font property
-        const padding = 5; // Add some padding for the text background
-    
-        // Draw the text background
-        context.fillStyle = 'rgba(255, 255, 255, 0.9)'; // semi-transparent white
-        context.fillRect(
-            labelX - padding,
-            labelY - padding,
-            textBackgroundWidth,
-            textBackgroundHeight
-        );
-    
-        // Set the style for the text
-        context.fillStyle = 'red';
-        context.textBaseline = 'top';
-    
-        // Draw the lesion label
-        context.font = 'bold 14px Arial'; // Make font bold
-        context.fillText(lesionLabel, labelX, labelY);
-    
-        // Draw the volume text below the lesion label
-        context.font = '14px Arial';
-        context.fillText(volumeText, labelX, labelY + lineHeight);
-        context.fillText(densityText, labelX, labelY + 2 * lineHeight);
-    }
-    
-
-    function updateTumorTable(dimensions, volumes) {
-        // Get the table body
-        var tableBody = document.getElementById('tumor-table').getElementsByTagName('tbody')[0];
-        
-        // Clear previous entries
-        tableBody.innerHTML = '';
-    
-        // Add rows for each tumor with dimensions data
-        dimensions.forEach((dimension, i) => {
-            var row = tableBody.insertRow();
-            var cellTumor = row.insertCell(0);
-            var cellWidth = row.insertCell(1);
-            var cellHeight = row.insertCell(2);
-            var cellDepth = row.insertCell(3);
-            var cellVolume = row.insertCell(4);
-            
-            cellTumor.textContent = i + 1;
-            cellWidth.textContent = dimension.width.toFixed(2);
-            cellHeight.textContent = dimension.height.toFixed(2);
-            cellDepth.textContent = dimension.depth.toFixed(2);
-            cellVolume.textContent = volumes[i].toFixed(2);
-        });
-    
-        // If less than 8 tumors, add empty rows until there are 8 rows total
-        for (let i = dimensions.length; i < 8; i++) {
-            var row = tableBody.insertRow();
-            var cellTumor = row.insertCell(0);
-            var cellWidth = row.insertCell(1);
-            var cellHeight = row.insertCell(2);
-            var cellDepth = row.insertCell(3);
-            var cellVolume = row.insertCell(4);
-            
-            cellTumor.textContent = i + 1;
-            cellWidth.textContent = '';
-            cellHeight.textContent = '';
-            cellDepth.textContent = '';
-            cellVolume.textContent = '';
-        }
-    }
-    
-
-    
-
 
     function overlaySegmentationOnDicomViewer(dicomViewerElement, segmentationCanvas) {
         const cornerstoneCanvas = $(dicomViewerElement).find('canvas').get(0);
@@ -892,13 +597,6 @@ $(document).ready(function() {
 
     var rangeSlider = document.getElementById("dicom-slider");
     var rangeBullet = document.getElementById("rs-bullet");
-
-    function initializeSlider() {
-        rangeSlider.max = dicomFiles.length - 1;
-        rangeSlider.value = Math.floor(dicomFiles.length / 2); // Setting slider to start from the middle
-        showSliderValue(); // Update display to reflect the starting position
-        loadDicomImage(parseInt(rangeSlider.value, 10)); // Load the image corresponding to the middle position
-    }
 
     function showSliderValue() {
         var value = parseInt(rangeSlider.value); // Get the current value of the slider
