@@ -3,7 +3,7 @@
 1. Python
 2. Any IDE (preferably VS Code)
 ## Project setup
-### Git Flow
+### Git Flow (OPTIONAL)
 Git Flow is a popular Git branching strategy aimed at simplifying release management. 
 
 1. Install Git Flow
@@ -25,4 +25,12 @@ A virtual environment in the context of Python development is a self-contained d
 1. Create a virtual environment by running 'python -m venv .venv' in your repository
 2. To activate the venv run 'source .venv/bin/activate' (on Linux / macOS) or .venv\Scripts\Activate.ps1 (on Windows)
 3. To install all packages run 'pip install -r requirements.txt'
+4. For step 3., make sure you check the torch and torchvision version/installation you need to use such that it is compatible with your device and the nnUnet framework
+
+## Usage instructions
+1. Activate .venv
+2. Within the .venv, you need to specify the environment variables for your model, see -> https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/set_environment_variables.md
+3. start the flask app by running 'python src/app.py'
+4. ![image](https://github.com/user-attachments/assets/b7044d44-e7f8-495a-80cc-85221edfe709) click on the localhost link to get to the webapp
+
 
