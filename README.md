@@ -1,4 +1,7 @@
 # xipeai-frontend
+## Requirements
+1. Python
+2. Any IDE (preferably VS Code)
 ## Project setup
 ### Git Flow
 Git Flow is a popular Git branching strategy aimed at simplifying release management. 
