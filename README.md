@@ -3,7 +3,8 @@
 1. Python
 2. Any IDE (preferably VS Code)
 3. A nnUnet model to predict. The minimal required folder structure looks as follows:
-   ``` models/
+   ```
+   models/
    │
    ├── nnUnet_raw/
    │   ├── Model_x/
