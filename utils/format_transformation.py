@@ -2,12 +2,9 @@ import SimpleITK as sitk
 import os
 import time
 from glob import glob
-from werkzeug.utils import safe_join
 import pydicom
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from pydicom.dataset import Dataset, FileDataset
-import datetime
 import shutil
 
 

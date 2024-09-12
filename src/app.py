@@ -3,7 +3,6 @@ import os
 import io
 from io import BytesIO
 import logging
-from PIL import Image
 from skimage.measure import label, regionprops
 from PIL import Image, ImageDraw
 # Append the parent directory to sys.path
@@ -13,21 +12,12 @@ import subprocess
 from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template, send_file
 from flask_cors import CORS
 import zipfile
-import shutil
-from werkzeug.utils import safe_join
 import pydicom
-from pydicom.data import get_testdata_files
-from pydicom.dataset import Dataset, FileMetaDataset
 import secrets
-from urllib.parse import unquote
 import dicom2nifti
 import utils.format_transformation as utils
-from PIL import Image
-import base64
-from datetime import datetime
 import numpy as np
 import SimpleITK as sitk
-import tempfile
 from zipfile import ZipFile
 from utils.format_transformation import get_dicom_voxel_dims, calculate_tumor_properties
 
