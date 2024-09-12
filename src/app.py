@@ -1,21 +1,35 @@
 import sys
 import os
+import io
+from io import BytesIO
 import logging
+from PIL import Image
+from skimage.measure import label, regionprops
+from PIL import Image, ImageDraw
 # Append the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import subprocess
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template, send_file
 from flask_cors import CORS
 import zipfile
 import shutil
 from werkzeug.utils import safe_join
 import pydicom
 from pydicom.data import get_testdata_files
+from pydicom.dataset import Dataset, FileMetaDataset
 import secrets
 from urllib.parse import unquote
 import dicom2nifti
 import utils.format_transformation as utils
+from PIL import Image
+import base64
+from datetime import datetime
+import numpy as np
+import SimpleITK as sitk
+import tempfile
+from zipfile import ZipFile
+from utils.format_transformation import get_dicom_voxel_dims, calculate_tumor_properties
 
 
 app = Flask(__name__)
@@ -50,29 +64,6 @@ os.makedirs(app.config['SEGMENTED_PP_FOLDER'], exist_ok=True)
 # Define the path to your 'src' directory relative to 'app.py'
 src_dir = os.path.abspath('src/')
 
-
-@app.route('/dicom-metadata/dummy')
-def dicom_metadata_dummy():
-    dummy_data = [
-        {"Field": "Name", "Value": "Sagway"},
-        {"Field": "First Name", "Value": "Donald"},
-        {"Field": "Patient ID", "Value": "6594589"},
-        {"Field": "Acquisition Date", "Value": "05.02.2026"},
-        {"Field": "Acquisition Time", "Value": "05:20:11"},
-        {"Field": "Result", "Value": "Critical(1)"},
-        {"Field": "Area (1)", "Value": "25mm²"},
-        {"Field": "Position (1)", "Value": "x25 y37"},
-        {"Field": "Area (2)", "Value": "NA"},  # Assuming NA means data not available
-        {"Field": "Position (2)", "Value": "NA"},  # Assuming NA means data not available
-        # ... add more fields as needed
-    ]
-    return jsonify(dummy_data)
- 
-@app.route('/')
-def index():
-    # Specify the path and file you want to serve
-    return render_template('index.html')
- 
 def remove_spaces_from_folders(root_dir, file_id):
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
         # Rename files with spaces
@@ -202,7 +193,120 @@ def find_nii_gz_file(directory):
     return None  # Return None if no .nii.gz file is found
 
 
-        
+def apply_window(image, center, width):
+    img_min = center - width // 2
+    img_max = center + width // 2
+    windowed = np.clip(image, img_min, img_max)
+    windowed = ((windowed - img_min) / (img_max - img_min) * 255).astype(np.uint8)
+    return windowed
+
+
+def get_bounding_boxes(mask, label_value):
+    labeled_mask = label(mask == label_value)
+    regions = regionprops(labeled_mask)
+    boxes = []
+    for region in regions:
+        min_row, min_col, max_row, max_col = region.bbox
+        boxes.append((min_row, min_col, max_row, max_col))
+    return boxes
+
+def draw_bounding_boxes(image, boxes, margin=5, thickness=2):
+    img_bbox = Image.fromarray(image).convert('RGB')
+    draw = ImageDraw.Draw(img_bbox)
+    for box in boxes:
+        top, left, bottom, right = box
+        top = max(0, top - margin)
+        left = max(0, left - margin)
+        bottom = min(image.shape[0], bottom + margin)
+        right = min(image.shape[1], right + margin)
+        for i in range(thickness):
+            draw.rectangle(
+                [left + i, top + i, right - i, bottom - i],
+                outline=(255, 0, 0)
+            )
+    del draw
+    return np.array(img_bbox)
+
+def create_dicom_with_bboxes(dicom_file, segmentation_file, filename):
+    # Decode the DICOM file data
+    ds = pydicom.dcmread(io.BytesIO(dicom_file.read()))
+    
+    # Get original pixel data and apply rescale
+    original_img = ds.pixel_array.astype(float)
+    original_img = original_img * ds.RescaleSlope + ds.RescaleIntercept
+
+    # Get window settings
+    window_center = ds.WindowCenter
+    window_width = ds.WindowWidth
+    if isinstance(window_center, pydicom.multival.MultiValue):
+        window_center = window_center[0]
+    if isinstance(window_width, pydicom.multival.MultiValue):
+        window_width = window_width[0]
+
+    # Apply the window
+    windowed_img = apply_window(original_img, window_center, window_width)
+
+    # Decode the segmentation file data
+    seg_ds = pydicom.dcmread(io.BytesIO(segmentation_file.read()))
+    mask = seg_ds.pixel_array
+
+    # Get bounding boxes for regions labeled as 2
+    boxes = get_bounding_boxes(mask, 2)
+
+    # Draw bounding boxes on the windowed image
+    img_bbox = draw_bounding_boxes(windowed_img, boxes)
+
+    # Modify DICOM tags
+    ds.PhotometricInterpretation = 'RGB'
+    ds.SamplesPerPixel = 3
+    ds.BitsAllocated = 8
+    ds.BitsStored = 8
+    ds.HighBit = 7
+    ds.PixelRepresentation = 0
+    ds.add_new(0x00280006, 'US', 0)
+    ds.is_little_endian = True
+    ds.fix_meta_info()
+
+    # Save pixel data and DICOM file to an in-memory byte stream
+    ds.PixelData = img_bbox.tobytes()
+    dicom_bytes = io.BytesIO()
+    ds.save_as(dicom_bytes)
+    dicom_bytes.seek(0)
+    
+    return dicom_bytes
+
+def get_summary(filename):
+    file_path = os.path.join(app.config["EXTRACTED_FOLDER"], filename)
+    
+    for file_name in os.listdir(file_path):
+        if "_summary" in file_name and file_name.endswith(".dcm"):
+            full_path = os.path.join(file_path, file_name)
+            # Assuming the file is already a binary DICOM file
+            with open(full_path, 'rb') as file:
+                return BytesIO(file.read())
+
+@app.route('/dicom-metadata/dummy')
+def dicom_metadata_dummy():
+    dummy_data = [
+        {"Field": "Name", "Value": "Sagway"},
+        {"Field": "First Name", "Value": "Donald"},
+        {"Field": "Patient ID", "Value": "6594589"},
+        {"Field": "Acquisition Date", "Value": "05.02.2026"},
+        {"Field": "Acquisition Time", "Value": "05:20:11"},
+        {"Field": "Result", "Value": "Critical(1)"},
+        {"Field": "Area (1)", "Value": "25mm²"},
+        {"Field": "Position (1)", "Value": "x25 y37"},
+        {"Field": "Area (2)", "Value": "NA"},  # Assuming NA means data not available
+        {"Field": "Position (2)", "Value": "NA"},  # Assuming NA means data not available
+        # ... add more fields as needed
+    ]
+    return jsonify(dummy_data)
+ 
+@app.route('/')
+def index():
+    # Specify the path and file you want to serve
+    return render_template('index.html')
+       
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if not request.files:
@@ -277,8 +381,6 @@ def upload_segmentation_file():
     else:
         return 'Invalid file format or no file selected'
 
- 
-
 def get_subfolders(directory, root_dir=None):
     if root_dir is None:
         root_dir = directory
@@ -294,7 +396,6 @@ def get_subfolders(directory, root_dir=None):
             subfolders_list.extend(subfolder_paths)
     return subfolders_list
     
-
 @app.route('/subfolders', methods=['GET'])
 def get_subfolders_route():
     # Return the list of DICOM subfolders stored in the session
@@ -345,7 +446,6 @@ def serve_segmented_dicom(filename):
     if not os.path.exists(file_path):
         return "File not found", 404
     return send_from_directory(os.path.dirname(file_path), os.path.basename(file_path))
-
 
 @app.route('/list-dicom-files')
 def list_dicom_files():
@@ -459,7 +559,6 @@ def dicom_metadata(filepath):
 
     return jsonify(ordered_metadata)
 
-
 @app.route('/run-analysis', methods=['POST'])
 def run_analysis():
     subfolder = request.json.get('subfolder')
@@ -467,6 +566,10 @@ def run_analysis():
     # construct input folder
     input_folder = os.path.abspath(app.config['NIFTI_FOLDER'])
     input_folder = os.path.join(input_folder, subfolder)
+
+    # construct extracetd folder
+    extracted_folder = os.path.abspath(app.config['EXTRACTED_FOLDER'])
+    extracted_folder = os.path.join(extracted_folder, subfolder)
     
     # construct output folder
     output_folder = os.path.abspath(app.config['SEGMENTED_FOLDER'])
@@ -504,7 +607,7 @@ def run_analysis():
     nifti_name = find_nii_gz_file(output_pp_folder)
     if nifti_name:
         input_dir = f"{output_pp_folder}/{nifti_name}"
-        utils.nifti2dicom_1file(input_dir, segmented_dicom_folder)
+        utils.nifti2dicom_1file(input_dir, extracted_folder, segmented_dicom_folder)
         
     # Get the list of subfolders
     segmented_dicom_subfolders = get_subfolders(app.config['SEGMENTED_DICOM'])
@@ -516,10 +619,84 @@ def run_analysis():
         "prediction_output": prediction_result['output'],
         "postprocessing_output": postprocess_result['output']
     })
+
+@app.route('/api/save_dicom_series', methods=['POST'])
+def save_dicom_series():
+    # Extract multiple files for dicoms and segmentations
+    dicom_files = request.files.getlist('dicomFiles')
+    segmentation_files = request.files.getlist('segmentationFiles')
+
+    # Check if any required files are missing
+    if not dicom_files or not segmentation_files:
+        return jsonify({'error': 'Missing DICOM or segmentation files'}), 400
+
+    # Extract additional parameters from the request
+    filename = request.form.get('filename', 'exported_series')
+    window_width = float(request.form.get('windowWidth', 150))
+    window_level = float(request.form.get('windowLevel', 60))
+
+    # Memory buffer for our ZIP file
+    in_memory = BytesIO()
+
+    try:
+        with ZipFile(in_memory, mode='w') as zf:
+            # Create folders in the ZIP file
+            zf.writestr(f"{filename}/processed_dicoms/", "")
+            zf.writestr(f"{filename}/original_dicoms/", "")
+
+            # Process each DICOM and segmentation pair
+            for i, (dicom_file, segmentation_file) in enumerate(zip(dicom_files, segmentation_files), 1):
+                # Process DICOM with bounding boxes
+                processed_data = create_dicom_with_bboxes(dicom_file, segmentation_file, filename)
+                zf.writestr(f"{filename}/processed_dicoms/processed_dicom_{i:03d}.dcm", processed_data.getvalue())
+
+                # Save original DICOM
+                dicom_file.seek(0)  # Reset file pointer to the beginning
+                zf.writestr(f"{filename}/original_dicoms/original_dicom_{i:03d}.dcm", dicom_file.read())
+
+            # Add a summary DICOM file
+            summary = get_summary(filename)
+            zf.writestr(f"{filename}/processed_dicoms/summary.dcm", summary.getvalue())
+
+        # Prepare the zip file to send
+        in_memory.seek(0)
+        return send_file(
+            in_memory,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{filename}.zip',
+        )
+    except Exception as e:
+        print("Exception:", str(e))  # Debugging statement
+        return jsonify({'error': str(e)}), 500
     
-    
-    
-    
+@app.route('/api/tumors/<path:subfolder>', methods=['GET'])
+def get_tumors(subfolder):
+    dicom_folder = os.path.join(app.config["EXTRACTED_FOLDER"], subfolder)
+    nifti_predicted_folder = os.path.join(app.config["SEGMENTED_PP_FOLDER"], subfolder)
+
+    voxel_dims = get_dicom_voxel_dims(dicom_folder)
+
+    # Read the NIfTI file
+    if os.path.exists(nifti_predicted_folder):
+        for file in os.listdir(nifti_predicted_folder):
+            if file.endswith('.nii') or file.endswith('.nii.gz'):
+                file_path = os.path.join(nifti_predicted_folder, file)
+
+            new_img = sitk.ReadImage(file_path)
+
+            # Convert the image to an integer type if necessary
+            if new_img.GetPixelID() in [sitk.sitkFloat32, sitk.sitkFloat64]:
+                new_img = sitk.Cast(new_img, sitk.sitkInt16)
+
+            tumor_properties = calculate_tumor_properties(new_img, voxel_dims)
+
+            print(tumor_properties)
+
+            return jsonify(tumor_properties)
+
+    return []
+
     
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5001)

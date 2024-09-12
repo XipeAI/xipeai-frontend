@@ -9,6 +9,9 @@
     <script src="https://unpkg.com/cornerstone-tools"></script>
     <script src="https://unpkg.com/cornerstone-wado-image-loader"></script>
     <script src="https://unpkg.com/dicom-parser"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+
     <script>
         cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
         cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
@@ -93,11 +96,11 @@
             <table id="tumor-table">
                 <thead>
                     <tr>
-                        <th>Lesion</th>
-                        <th>Width</th>
-                        <th>Height</th>
-                        <th>Depth</th>
-                        <th>Volume</th>
+                        <th>Tumor ID</th>
+                        <th>Width (mm)</th>
+                        <th>Height (mm)</th>
+                        <th>Depth (mm)</th>
+                        <th>Volume (cubic mm)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -113,6 +116,7 @@
         <input type="range" min="1" max="100" value="50" class="slider" id="dicom-slider">
     </div>
     <span id="rs-bullet" class="rs-label">0 / 0</span>
+    <button id="exportButton">Export All Images</button>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 
