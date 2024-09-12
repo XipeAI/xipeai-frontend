@@ -3,7 +3,7 @@
 1. Python
 2. Any IDE (preferably VS Code)
 3. A nnUnet model to predict. The minimal required folder structure looks as follows:
-   models/
+   ``` models/
    │
    ├── nnUnet_raw/
    │   ├── Model_x/
@@ -48,7 +48,7 @@
    │   │   │   └── plans.json
    │   │   ├── inference_information.json
    │   │   └── inference_instructions.txt
-
+   ```
    To train a model to retrieve the provided folder structure, follow the instructions here: https://github.com/MIC-DKFZ/nnUNet?tab=readme-ov-file
    
 ## Project setup
