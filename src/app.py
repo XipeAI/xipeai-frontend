@@ -200,10 +200,38 @@ def get_bounding_boxes(mask, label_value):
         boxes.append((min_row, min_col, max_row, max_col))
     return boxes
 
+def merge_boxes(boxes):
+    merged = []
+    while boxes:
+        base = boxes.pop(0)
+        i = 0
+        while i < len(boxes):
+            if do_boxes_overlap(base, boxes[i]):
+                base = merge_two_boxes(base, boxes.pop(i))
+            else:
+                i += 1
+        merged.append(base)
+    return merged
+
+def do_boxes_overlap(box1, box2):
+    return not (box1[2] < box2[0] or box1[0] > box2[2] or box1[3] < box2[1] or box1[1] > box2[3])
+
+def merge_two_boxes(box1, box2):
+    return [
+        min(box1[0], box2[0]),
+        min(box1[1], box2[1]),
+        max(box1[2], box2[2]),
+        max(box1[3], box2[3])
+    ]
+
 def draw_bounding_boxes(image, boxes, margin=5, thickness=2):
     img_bbox = Image.fromarray(image).convert('RGB')
     draw = ImageDraw.Draw(img_bbox)
-    for box in boxes:
+    
+    # Merge overlapping boxes
+    merged_boxes = merge_boxes(boxes)
+    
+    for box in merged_boxes:
         top, left, bottom, right = box
         top = max(0, top - margin)
         left = max(0, left - margin)
