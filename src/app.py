@@ -87,21 +87,27 @@ def clear_directory(directory):
 
 def process_dicom_series(extracted_folder, nifti_output_folder, file_id):
     for root, dirs, files in os.walk(extracted_folder):
-        if files:  # If there are files in the directory, assume it's a DICOM series
-            subfolder_name = os.path.basename(root)
-            subfolder_name = os.path.join(file_id[-8:-4], subfolder_name)
-            nifti_subfolder_path = os.path.join(nifti_output_folder, subfolder_name)
-            os.makedirs(nifti_subfolder_path, exist_ok=True)  # Ensure subfolder exists
-            
-            try:
-                dicom2nifti.convert_directory(root, nifti_subfolder_path)
-                print(f"Converted DICOM series in {root} to NIfTI in {nifti_subfolder_path}")
+        # print(f"Checking {root}, found files: {files}") 
+        files = [f for f in files if not f.startswith('.')]  # Ignore hidden files
+        # if files:  # If there are files in the directory, assume it's a DICOM series
+        if not any(f.lower().endswith('.dcm') for f in files):
+            print(f"Skipping {root}, no DICOM files found.")
+            continue
 
-                # Rename files
-                rename_nifti_files(nifti_subfolder_path)
-            except Exception as e:
-                print(f"Error converting DICOM series in {root}: {e}")
-                # Optionally, use `flash(f"Error converting DICOM series in {root}: {e}")` to send feedback to the template
+        subfolder_name = os.path.basename(root)
+        subfolder_name = os.path.join(file_id[-8:-4], subfolder_name)
+        nifti_subfolder_path = os.path.join(nifti_output_folder, subfolder_name)
+        os.makedirs(nifti_subfolder_path, exist_ok=True)  # Ensure subfolder exists
+        
+        try:
+            dicom2nifti.convert_directory(root, nifti_subfolder_path)
+            print(f"Converted DICOM series in {root} to NIfTI in {nifti_subfolder_path}")
+
+            # Rename files
+            rename_nifti_files(nifti_subfolder_path)
+        except Exception as e:
+            print(f"Error converting DICOM series in {root}: {e}")
+            # Optionally, use `flash(f"Error converting DICOM series in {root}: {e}")` to send feedback to the template
 
 
 def rename_nifti_files(nifti_subfolder_path):
@@ -591,10 +597,7 @@ def run_analysis():
     
     # construct output folder
     output_folder = os.path.abspath(app.config['SEGMENTED_FOLDER'])
-    print(output_folder)
-    print(subfolder)
     output_folder = os.path.join(output_folder, subfolder)
-    print(output_folder)
     os.makedirs(output_folder, exist_ok=True)
     
     # construct output_pp folder
@@ -608,14 +611,15 @@ def run_analysis():
     os.makedirs(segmented_dicom_folder, exist_ok=True)
     
     # Command 1: Predicting with nnUNet
-    predict_command = f'nnUNetv2_predict -d Dataset002_Liver -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
+    # predict_command = f'nnUNetv2_predict -d Dataset010_LiverLiTSCropping -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
+    predict_command = f'nnUNetv2_predict -d Dataset001_LiverLiTS -i {input_folder} -o {output_folder} -f 0 1 2 3 4 -tr nnUNetTrainer -c 3d_fullres -p nnUNetPlans'
     prediction_result = run_command(predict_command)
     
     if not prediction_result['success']:
         return jsonify({"success": False, "message": "Prediction failed", "error": prediction_result['error']}), 500
 
     # Command 2: Applying postprocessing with nnUNet
-    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "C:/MyPythonProjects/XipeAI/models/nnUnet_results/Dataset002_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "C:/MyPythonProjects/XipeAI/models/nnUnet_results/Dataset002_Liver/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
+    postprocess_command = f'nnUNetv2_apply_postprocessing -i {output_folder} -o {output_pp_folder} -pp_pkl_file "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_LiverLiTS/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/postprocessing.pkl" -np 8 -plans_json "/ceph/fabiwolf/xipe/data/nnUnet/nnUnet_results/Dataset001_LiverLiTS/nnUNetTrainer__nnUNetPlans__3d_fullres/crossval_results_folds_0_1_2_3_4/plans.json"'
     postprocess_result = run_command(postprocess_command)
     
     if not postprocess_result['success']:
